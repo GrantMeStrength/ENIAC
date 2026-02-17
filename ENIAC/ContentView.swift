@@ -11,9 +11,14 @@ import RealityKit
 struct ContentView: View {
 
     var body: some View {
-        VStack {
+        VStack(spacing: 12) {
+            Text("ENIAC")
+                .font(.headline)
             ToggleImmersiveSpaceButton()
+                .controlSize(.small)
         }
+        .padding(20)
+        .frame(minWidth: 220, minHeight: 120)
     }
 }
 
