@@ -45,8 +45,8 @@ struct ImmersiveView: View {
         RealityView { content in
             do {
                 let immersiveContentEntity = try await Entity(named: "Immersive", in: realityKitContentBundle)
-                if let ground = immersiveContentEntity.findEntity(named: "Ground") {
-                    ground.removeFromParent()
+                if let videoDock = immersiveContentEntity.findEntity(named: "Video_Dock") {
+                    videoDock.removeFromParent()
                 }
                 content.add(immersiveContentEntity)
             } catch {
@@ -283,8 +283,8 @@ struct ImmersiveView: View {
                 let texture = try TextureResource.load(contentsOf: url)
                 if name.contains("control") {
                     controlTextures.append(texture)
-                } else if name.hasPrefix("e480s") {
-                    let suffix = name.replacingOccurrences(of: "e480s", with: "")
+                } else if name.hasPrefix("e3500s") {
+                    let suffix = name.replacingOccurrences(of: "e3500s", with: "")
                     if let index = Int(suffix), (1...5).contains(index) {
                         rowTextureSlots[index - 1] = texture
                     }
@@ -330,16 +330,21 @@ struct ImmersiveView: View {
         let wheelOffsetX = unitWidth * 0.45
         let wheelOffsetZ = unitDepth * 0.45
         let baseY = unitHeight * 0.5 + floorClearance + wheelRadius * 2
-        let material = SimpleMaterial(color: UIColor(white: 0.2, alpha: 1.0),
-                                       roughness: 0.85,
-                                       isMetallic: false)
+        
+        // Load free-standing unit texture
+        var freestandingTexture: TextureResource?
+        if let url = realityKitContentBundle.url(forResource: "free-standing-texture", withExtension: "png", subdirectory: "Photographs") {
+            freestandingTexture = try? TextureResource.load(contentsOf: url)
+            print("Loaded free-standing texture from: \(url.lastPathComponent)")
+        } else {
+            print("Failed to find free-standing-texture.png")
+        }
+        
+        let frameMaterial = SimpleMaterial(color: UIColor(white: 0.2, alpha: 1.0),
+                                           roughness: 0.85,
+                                           isMetallic: false)
         let mesh = MeshResource.generateBox(size: SIMD3(unitWidth, unitHeight, unitDepth))
-        let spacing: Float = unitWidth * 1.4
-        let positions = [
-            SIMD3(-spacing, baseY, centerZ),
-            SIMD3(0, baseY, centerZ),
-            SIMD3(spacing, baseY, centerZ)
-        ]
+        
         let wheelMaterial = SimpleMaterial(color: UIColor(white: 0.1, alpha: 1.0),
                                             roughness: 0.7,
                                             isMetallic: false)
@@ -350,20 +355,30 @@ struct ImmersiveView: View {
             SIMD3(-wheelOffsetX, -unitHeight * 0.5 - wheelRadius, wheelOffsetZ),
             SIMD3(wheelOffsetX, -unitHeight * 0.5 - wheelRadius, wheelOffsetZ)
         ]
-        let orientations: [Float] = [-0.2, 0.1, 0.3]
-        for (index, position) in positions.enumerated() {
-            let unit = ModelEntity(mesh: mesh, materials: [material])
-            unit.position = position
-            unit.orientation = simd_quatf(angle: orientations[index % orientations.count],
-                                          axis: SIMD3(0, 1, 0))
-            for offset in wheelOffsets {
-                let wheel = ModelEntity(mesh: wheelMesh, materials: [wheelMaterial])
-                wheel.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(1, 0, 0))
-                wheel.position = offset
-                unit.addChild(wheel)
-            }
-            root.addChild(unit)
+        
+        // Single unit in center of U, angled towards user
+        let unit = ModelEntity(mesh: mesh, materials: [frameMaterial])
+        unit.position = SIMD3(0, baseY, centerZ * 0.6)
+        unit.orientation = simd_quatf(angle: 0.3, axis: SIMD3(0, 1, 0))
+        
+        // Add textured front face (largest face: width x height)
+        if let texture = freestandingTexture {
+            let faceMesh = MeshResource.generatePlane(width: unitWidth, height: unitHeight)
+            var faceMaterial = UnlitMaterial()
+            faceMaterial.color = .init(tint: .white, texture: MaterialParameters.Texture(texture))
+            let face = ModelEntity(mesh: faceMesh, materials: [faceMaterial])
+            face.position = SIMD3(0, 0, unitDepth * 0.5 + 0.01)
+            unit.addChild(face)
         }
+        
+        for offset in wheelOffsets {
+            let wheel = ModelEntity(mesh: wheelMesh, materials: [wheelMaterial])
+            wheel.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(1, 0, 0))
+            wheel.position = offset
+            unit.addChild(wheel)
+        }
+        root.addChild(unit)
+        
         return root
     }
 
@@ -426,6 +441,7 @@ struct ImmersiveView: View {
         let root = Entity()
         let wallThickness: Float = 0.12
         let floorThickness: Float = 0.002
+        let floorY: Float = 0.0  // Floor at ground level
         let halfWidth = layout.width * 0.5
         let halfDepth = layout.depth * 0.5
 
@@ -459,7 +475,7 @@ struct ImmersiveView: View {
 
         let floor = ModelEntity(mesh: .generateBox(size: SIMD3(layout.width, floorThickness, layout.depth)),
                                 materials: [floorMaterial])
-        floor.position = SIMD3(layout.center.x, -floorThickness * 0.5, layout.center.z)
+        floor.position = SIMD3(layout.center.x, floorY, layout.center.z)
         root.addChild(floor)
 
         var windowMaterial = UnlitMaterial()
@@ -521,7 +537,7 @@ struct ImmersiveView: View {
 
         let directional = DirectionalLight()
         directional.light.color = warmLight
-        directional.light.intensity = 120000
+        directional.light.intensity = 1200
         directional.position = SIMD3(layout.center.x,
                                      layout.height,
                                      layout.center.z + layout.depth * 0.45)
@@ -532,7 +548,7 @@ struct ImmersiveView: View {
 
         let fillDirectional = DirectionalLight()
         fillDirectional.light.color = warmLight
-        fillDirectional.light.intensity = 80000
+        fillDirectional.light.intensity = 800
         fillDirectional.position = SIMD3(layout.center.x,
                                          layout.height,
                                          layout.center.z - layout.depth * 0.45)
@@ -554,7 +570,7 @@ struct ImmersiveView: View {
         for position in pointPositions {
             let light = PointLight()
             light.light.color = warmLight
-            light.light.intensity = 45000
+            light.light.intensity = 600
             light.light.attenuationRadius = attenuation
             light.position = position
             root.addChild(light)
@@ -562,7 +578,7 @@ struct ImmersiveView: View {
 
         let ambientFill = PointLight()
         ambientFill.light.color = warmLight
-        ambientFill.light.intensity = 65000
+        ambientFill.light.intensity = 800
         ambientFill.light.attenuationRadius = attenuation
         ambientFill.position = SIMD3(layout.center.x, layout.height * 0.7, layout.center.z)
         root.addChild(ambientFill)
