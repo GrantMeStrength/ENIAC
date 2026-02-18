@@ -101,7 +101,7 @@ struct ImmersiveView: View {
         .onAppear {
             startBlinking()
         }
-        .onChange(of: blinkLights.count) { _ in
+        .onChange(of: blinkLights.count) {
             startBlinking()
         }
         .onDisappear {
@@ -181,7 +181,7 @@ struct ImmersiveView: View {
         let panelY = panelHeight * 0.5 + floorClearance
 
         let baseHalfWidth = Float(basePanelCount - 1) * panelPitch * 0.5
-        let legStartZ = panelDepth * 0.5 + panelWidth * 0.5 + cornerGap
+        let _ = panelDepth * 0.5 + panelWidth * 0.5 + cornerGap  // legStartZ calculation
         let sideLength = Float(sidePanelCount - 1) * panelPitch
         let backZ = -sideLength
         for index in 0..<basePanelCount {
@@ -323,10 +323,10 @@ struct ImmersiveView: View {
                                  centerZ: Float,
                                  floorClearance: Float) -> Entity {
         let root = Entity()
-        let unitWidth: Float = 2.0
-        let unitDepth: Float = 0.5
-        let unitHeight: Float = 2.0
-        let wheelRadius: Float = 0.05
+        let unitWidth: Float = 1.2  // 60% of 2.0
+        let unitDepth: Float = 0.3  // 60% of 0.5
+        let unitHeight: Float = 1.2  // 60% of 2.0
+        let wheelRadius: Float = 0.03  // 60% of 0.05
         let wheelOffsetX = unitWidth * 0.45
         let wheelOffsetZ = unitDepth * 0.45
         let baseY = unitHeight * 0.5 + floorClearance + wheelRadius * 2
@@ -553,6 +553,7 @@ struct ImmersiveView: View {
         let directional = DirectionalLight()
         directional.light.color = warmLight
         directional.light.intensity = 1200
+        directional.shadow = DirectionalLightComponent.Shadow(maximumDistance: 30.0, depthBias: 1.0)
         directional.position = SIMD3(layout.center.x,
                                      layout.height,
                                      layout.center.z + layout.depth * 0.45)
@@ -572,29 +573,55 @@ struct ImmersiveView: View {
                              relativeTo: nil)
         root.addChild(fillDirectional)
 
-        let attenuation = max(layout.width, layout.depth) * 2.0
-        let pointPositions = [
-            SIMD3(layout.center.x, layout.height - 0.25, layout.center.z),
-            SIMD3(layout.center.x, layout.height - 0.25, layout.center.z - layout.depth * 0.3),
-            SIMD3(layout.center.x, layout.height - 0.25, layout.center.z + layout.depth * 0.3),
-            SIMD3(layout.center.x - layout.width * 0.35, layout.height - 0.25, layout.center.z),
-            SIMD3(layout.center.x + layout.width * 0.35, layout.height - 0.25, layout.center.z),
-            SIMD3(layout.center.x - layout.width * 0.35, layout.height - 0.25, layout.center.z + layout.depth * 0.3),
-            SIMD3(layout.center.x + layout.width * 0.35, layout.height - 0.25, layout.center.z + layout.depth * 0.3)
-        ]
-        for position in pointPositions {
-            let light = PointLight()
-            light.light.color = warmLight
-            light.light.intensity = 600
-            light.light.attenuationRadius = attenuation
-            light.position = position
-            root.addChild(light)
+        // Add fluorescent ceiling lights
+        let fixtureWidth: Float = 1.2
+        let fixtureDepth: Float = 0.3
+        let fixtureHeight: Float = 0.08
+        let fixtureY = layout.height - fixtureHeight * 0.5 - 0.05
+        
+        let fixtureMaterial = SimpleMaterial(color: UIColor(white: 0.95, alpha: 1.0),
+                                              roughness: 0.3,
+                                              isMetallic: false)
+        let emissiveMaterial = UnlitMaterial(color: UIColor(white: 0.98, alpha: 1.0))
+        
+        // Grid of fluorescent fixtures (8 rows x 6 columns = 48 lights)
+        let rows = 8
+        let cols = 6
+        let spacingX = layout.width / Float(cols + 1)
+        let spacingZ = layout.depth / Float(rows + 1)
+        
+        for row in 0..<rows {
+            for col in 0..<cols {
+                let x = layout.center.x - layout.width * 0.5 + spacingX * Float(col + 1)
+                let z = layout.center.z - layout.depth * 0.5 + spacingZ * Float(row + 1)
+                
+                // Fixture housing
+                let fixtureMesh = MeshResource.generateBox(size: SIMD3(fixtureWidth, fixtureHeight, fixtureDepth))
+                let fixture = ModelEntity(mesh: fixtureMesh, materials: [fixtureMaterial])
+                fixture.position = SIMD3(x, fixtureY, z)
+                root.addChild(fixture)
+                
+                // Emissive panel (light-emitting surface) - positioned below fixture to avoid z-fighting
+                let panelThickness: Float = 0.01
+                let panelMesh = MeshResource.generateBox(size: SIMD3(fixtureWidth * 0.95, panelThickness, fixtureDepth * 0.95))
+                let panel = ModelEntity(mesh: panelMesh, materials: [emissiveMaterial])
+                panel.position = SIMD3(0, -fixtureHeight * 0.5 - panelThickness * 0.5 - 0.005, 0)
+                fixture.addChild(panel)
+                
+                // Point light from fixture
+                let light = PointLight()
+                light.light.color = warmLight
+                light.light.intensity = 300
+                light.light.attenuationRadius = max(layout.width, layout.depth) * 0.4
+                light.position = SIMD3(0, -fixtureHeight * 0.5 - 0.01, 0)
+                fixture.addChild(light)
+            }
         }
 
         let ambientFill = PointLight()
         ambientFill.light.color = warmLight
         ambientFill.light.intensity = 800
-        ambientFill.light.attenuationRadius = attenuation
+        ambientFill.light.attenuationRadius = max(layout.width, layout.depth) * 2.0
         ambientFill.position = SIMD3(layout.center.x, layout.height * 0.7, layout.center.z)
         root.addChild(ambientFill)
         return root
