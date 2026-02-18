@@ -333,11 +333,15 @@ struct ImmersiveView: View {
         
         // Load free-standing unit texture
         var freestandingTexture: TextureResource?
+        // Try both search methods like loadPanelTextures does
         if let url = realityKitContentBundle.url(forResource: "free-standing-texture", withExtension: "png", subdirectory: "Photographs") {
             freestandingTexture = try? TextureResource.load(contentsOf: url)
-            print("Loaded free-standing texture from: \(url.lastPathComponent)")
+            print("Loaded free-standing texture from Photographs: \(url.lastPathComponent)")
+        } else if let url = realityKitContentBundle.url(forResource: "free-standing-texture", withExtension: "png", subdirectory: nil) {
+            freestandingTexture = try? TextureResource.load(contentsOf: url)
+            print("Loaded free-standing texture from root: \(url.lastPathComponent)")
         } else {
-            print("Failed to find free-standing-texture.png")
+            print("Failed to find free-standing-texture.png in bundle")
         }
         
         let frameMaterial = SimpleMaterial(color: UIColor(white: 0.2, alpha: 1.0),
@@ -356,10 +360,10 @@ struct ImmersiveView: View {
             SIMD3(wheelOffsetX, -unitHeight * 0.5 - wheelRadius, wheelOffsetZ)
         ]
         
-        // Single unit in center of U, angled towards user
+        // Single unit in center of U, angled towards user, positioned near back wall
         let unit = ModelEntity(mesh: mesh, materials: [frameMaterial])
-        unit.position = SIMD3(0, baseY, centerZ * 0.6)
-        unit.orientation = simd_quatf(angle: 0.3, axis: SIMD3(0, 1, 0))
+        unit.position = SIMD3(0, baseY, centerZ * 2.0)
+        unit.orientation = simd_quatf(angle: 0.6, axis: SIMD3(0, 1, 0))
         
         // Add textured front face (largest face: width x height)
         if let texture = freestandingTexture {
@@ -521,13 +525,24 @@ struct ImmersiveView: View {
                                                   withExtension: "png",
                                                   subdirectory: "Textures"),
            let texture = try? TextureResource.load(contentsOf: url) {
-            var material = SimpleMaterial(color: .white, roughness: 0.85, isMetallic: false)
-            material.color = .init(tint: UIColor(white: 0.95, alpha: 1.0),
+            var material = SimpleMaterial(color: .white, roughness: 0.2, isMetallic: false)
+            material.color = .init(tint: .white,
                                    texture: MaterialParameters.Texture(texture))
+            print("Loaded floor checker texture")
+            return material
+        } else if let url = realityKitContentBundle.url(forResource: "floor_checker",
+                                                         withExtension: "png",
+                                                         subdirectory: nil),
+                  let texture = try? TextureResource.load(contentsOf: url) {
+            var material = SimpleMaterial(color: .white, roughness: 0.2, isMetallic: false)
+            material.color = .init(tint: .white,
+                                   texture: MaterialParameters.Texture(texture))
+            print("Loaded floor checker texture from root")
             return material
         }
+        print("Failed to load floor checker texture, using fallback")
         return SimpleMaterial(color: UIColor(white: 0.92, alpha: 1.0),
-                              roughness: 0.85,
+                              roughness: 0.2,
                               isMetallic: false)
     }
 
