@@ -53,7 +53,7 @@ struct ImmersiveView: View {
                   fact: "The accumulators could add two numbers in just 200 microseconds — about 5,000 additions per second.",
                   position: SIMD3(-1.9, 1.2, -6.2),
                   faceNormal: SIMD3(1, 0, 0),
-                  viewOffset: SIMD3(-0.8, 0, -6.2)),
+                  viewOffset: SIMD3(-0.5, 0, -6.2)),
         // Left leg - Accumulators (mid-section)
         InfoPoint(id: "info_accumulators_mid",
                   title: "Accumulators 3-10",
@@ -61,7 +61,7 @@ struct ImmersiveView: View {
                   fact: "Each accumulator contained 550 vacuum tubes — one reason ENIAC needed 18,000 tubes total.",
                   position: SIMD3(-1.9, 1.2, -4.0),
                   faceNormal: SIMD3(1, 0, 0),
-                  viewOffset: SIMD3(-0.6, 0, -4.0)),
+                  viewOffset: SIMD3(-0.3, 0, -4.0)),
         // Left leg - Multiplier (front of left leg)
         InfoPoint(id: "info_multiplier",
                   title: "High-Speed Multiplier",
@@ -69,7 +69,7 @@ struct ImmersiveView: View {
                   fact: "The multiplier was considered ENIAC's most complex subsystem, requiring precise timing across multiple accumulator units.",
                   position: SIMD3(-1.9, 1.2, -1.8),
                   faceNormal: SIMD3(1, 0, 0),
-                  viewOffset: SIMD3(-0.6, 0, -1.8)),
+                  viewOffset: SIMD3(-0.3, 0, -1.8)),
         // Right leg - Function Tables (near back of right leg)
         InfoPoint(id: "info_function_tables",
                   title: "Function Tables",
@@ -77,7 +77,7 @@ struct ImmersiveView: View {
                   fact: "Function tables were programmed by setting hundreds of rotary dial switches by hand — a painstaking process that could take hours.",
                   position: SIMD3(1.9, 1.2, -5.8),
                   faceNormal: SIMD3(-1, 0, 0),
-                  viewOffset: SIMD3(0.6, 0, -5.8)),
+                  viewOffset: SIMD3(0.3, 0, -5.8)),
         // Right leg - Constant Transmitters (mid-section)
         InfoPoint(id: "info_constants",
                   title: "Constant Transmitters",
@@ -85,7 +85,7 @@ struct ImmersiveView: View {
                   fact: "Constant transmitters used rotary dial switches — similar to combination locks — to set each digit of a number.",
                   position: SIMD3(1.9, 1.2, -3.5),
                   faceNormal: SIMD3(-1, 0, 0),
-                  viewOffset: SIMD3(0.6, 0, -3.5)),
+                  viewOffset: SIMD3(0.3, 0, -3.5)),
         // Right leg - Printer (front of right leg)
         InfoPoint(id: "info_printer",
                   title: "Printer Unit",
@@ -93,7 +93,7 @@ struct ImmersiveView: View {
                   fact: "ENIAC used IBM punched cards both for input and output — the same card technology that had been used in tabulating machines since the 1890s.",
                   position: SIMD3(1.9, 1.2, -1.2),
                   faceNormal: SIMD3(-1, 0, 0),
-                  viewOffset: SIMD3(0.6, 0, -1.2)),
+                  viewOffset: SIMD3(0.3, 0, -1.2)),
         // Back wall - Master Programmer (left side of back wall)
         InfoPoint(id: "info_master_programmer",
                   title: "Master Programmer",
@@ -101,7 +101,7 @@ struct ImmersiveView: View {
                   fact: "Reprogramming ENIAC could take days of rewiring. In 1948, a stored-program modification allowed instructions to be stored in the function tables instead.",
                   position: SIMD3(-1.5, 1.2, -6.9),
                   faceNormal: SIMD3(0, 0, 1),
-                  viewOffset: SIMD3(-1.5, 0, -5.5)),
+                  viewOffset: SIMD3(-1.5, 0, -5.0)),
         // Back wall - Cycling Unit (center of back wall)
         InfoPoint(id: "info_cycling_unit",
                   title: "Cycling Unit",
@@ -109,7 +109,7 @@ struct ImmersiveView: View {
                   fact: "ENIAC was roughly 1,000 times faster than existing electromechanical calculators, completing in seconds what previously took days.",
                   position: SIMD3(0.0, 1.2, -6.9),
                   faceNormal: SIMD3(0, 0, 1),
-                  viewOffset: SIMD3(0.0, 0, -5.5)),
+                  viewOffset: SIMD3(0.0, 0, -5.0)),
         // Back wall - Initiating Unit (right side of back wall)
         InfoPoint(id: "info_initiating_unit",
                   title: "Initiating Unit",
@@ -117,15 +117,15 @@ struct ImmersiveView: View {
                   fact: "Six women — Kay McNulty, Betty Jennings, Betty Snyder, Marlyn Meltzer, Fran Bilas, and Ruth Lichterman — were ENIAC's first programmers, configuring it for ballistic trajectory calculations.",
                   position: SIMD3(1.5, 1.2, -6.9),
                   faceNormal: SIMD3(0, 0, 1),
-                  viewOffset: SIMD3(1.5, 0, -5.5)),
+                  viewOffset: SIMD3(1.5, 0, -5.0)),
         // Center of U - Portable Function Table
         InfoPoint(id: "info_portable_unit",
                   title: "Portable Function Table",
                   description: "A free-standing wheeled cabinet that could be rolled up and connected to the main ENIAC frame. It provided additional memory and function storage, and could be swapped out with different configurations for different problems.",
                   fact: "The portable design was remarkably forward-thinking — it introduced modularity to computing years before it became standard practice.",
-                  position: SIMD3(0.0, 0.8, -3.5),
+                  position: SIMD3(-0.8, 0.8, -3.5),
                   faceNormal: SIMD3(0, 0, 1),
-                  viewOffset: SIMD3(0.0, 0, -2.0)),
+                  viewOffset: SIMD3(-0.8, 0, -1.8)),
         // Photo wall - The Programmers (left side)
         InfoPoint(id: "info_programmers",
                   title: "The ENIAC Programmers",
@@ -133,7 +133,7 @@ struct ImmersiveView: View {
                   fact: "The ENIAC programmers were originally called 'computers' — the job title for people who performed calculations. They became the world's first electronic computer programmers.",
                   position: SIMD3(-1.8, 1.5, 1.8),
                   faceNormal: SIMD3(0, 0, -1),
-                  viewOffset: SIMD3(-1.8, 0, 0.5)),
+                  viewOffset: SIMD3(-1.8, 0, 0.3)),
         // Photo wall - Eckert & Mauchly (right side)
         InfoPoint(id: "info_inventors",
                   title: "Eckert & Mauchly",
@@ -141,7 +141,7 @@ struct ImmersiveView: View {
                   fact: "After ENIAC, Eckert and Mauchly founded the first computer company and built UNIVAC I — the first commercial computer in the United States.",
                   position: SIMD3(1.8, 1.5, 1.8),
                   faceNormal: SIMD3(0, 0, -1),
-                  viewOffset: SIMD3(1.8, 0, 0.5)),
+                  viewOffset: SIMD3(1.8, 0, 0.3)),
     ]
 
     private struct RoomLayout {
@@ -237,11 +237,20 @@ struct ImmersiveView: View {
                 if let attachment = attachments.entity(for: info.id) {
                     let panelAnchor = Entity()
                     panelAnchor.name = "infopanel_\(info.id)"
+                    
+                    // Position panel flush against the object, offset slightly in the face normal direction
                     let normal = simd_normalize(info.faceNormal)
-                    // Position panel at eye level (~1.6m) regardless of info point height
+                    let panelOffset: Float = 0.15  // Small offset from surface
                     let eyeLevelY: Float = 1.55
-                    let panelY = eyeLevelY - info.position.y  // Offset to reach eye level
-                    panelAnchor.position = info.position + normal * 0.8 + SIMD3(0, panelY, 0)
+                    
+                    // Panel appears at the info point position, at eye level, slightly in front
+                    let panelPosition = SIMD3<Float>(
+                        info.position.x + normal.x * panelOffset,
+                        eyeLevelY,
+                        info.position.z + normal.z * panelOffset
+                    )
+                    
+                    panelAnchor.position = panelPosition
                     panelAnchor.components.set(BillboardComponent())
                     panelAnchor.addChild(attachment)
                     panelAnchor.isEnabled = false
@@ -1122,7 +1131,7 @@ struct ImmersiveView: View {
             let photoHeight: Float = 0.406
             let frameInset: Float = 0.03
             let frameDepth: Float = 0.02
-            let captionHeight: Float = 0.06
+           // let captionHeight: Float = 0.06
             let captionGap: Float = 0.02
             let photoY: Float = 1.6
             let photoZ = layout.center.z + halfDepth - wallThickness * 0.5 - 0.005
@@ -1481,13 +1490,24 @@ struct ImmersiveView: View {
                          relativeTo: nil)
         root.addChild(directional)
 
-        // Ambient fill light to brighten floor and ceiling
-        let ambient = PointLight()
-        ambient.light.color = warmLight
-        ambient.light.intensity = 12000
-        ambient.light.attenuationRadius = 25.0
-        ambient.position = SIMD3(layout.center.x, layout.height * 0.5, layout.center.z)
-        root.addChild(ambient)
+        // Multiple fill lights distributed around the room for better ambient coverage
+        let fillLightIntensity: Float = 8000
+        let fillLightRadius: Float = 15.0
+        let fillPositions: [SIMD3<Float>] = [
+            SIMD3(layout.center.x - layout.width * 0.3, layout.height * 0.6, layout.center.z - layout.depth * 0.3),
+            SIMD3(layout.center.x + layout.width * 0.3, layout.height * 0.6, layout.center.z - layout.depth * 0.3),
+            SIMD3(layout.center.x - layout.width * 0.3, layout.height * 0.6, layout.center.z + layout.depth * 0.3),
+            SIMD3(layout.center.x + layout.width * 0.3, layout.height * 0.6, layout.center.z + layout.depth * 0.3),
+            SIMD3(layout.center.x, layout.height * 0.4, layout.center.z),  // Center lower fill
+        ]
+        for pos in fillPositions {
+            let fill = PointLight()
+            fill.light.color = warmLight
+            fill.light.intensity = fillLightIntensity
+            fill.light.attenuationRadius = fillLightRadius
+            fill.position = pos
+            root.addChild(fill)
+        }
 
         // Circular ceiling lights (period-appropriate)
         let lightRadius: Float = 0.2
