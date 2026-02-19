@@ -16,6 +16,8 @@ struct ContentView: View {
                 .font(.headline)
             ToggleImmersiveSpaceButton()
                 .controlSize(.small)
+            Text("Electronic Numerical Integrator and Computer, 1946")
+                .font(.caption)
         }
         .padding(20)
         .frame(minWidth: 220, minHeight: 120)

@@ -16,7 +16,7 @@ struct ImmersiveView: View {
     private let eniacTargetLengthMeters: Float = 30.5
     private let eniacPaddingMeters: Float = 2.0
     private let useProceduralLayout = true
-    private let roomHeightMeters: Float = 3.2
+    private let roomHeightMeters: Float = 3.0
     @State private var blinkLights: [BlinkLight] = []
     @State private var blinkTask: Task<Void, Never>?
     @State private var depthDragMode = false
@@ -37,37 +37,37 @@ struct ImmersiveView: View {
                   title: "Accumulators",
                   description: "The main arithmetic units of ENIAC, capable of addition, subtraction, and number storage. Twenty accumulators worked in parallel, each storing a 10-digit decimal number using vacuum tubes. They formed the computational heart of the machine.",
                   fact: "Each accumulator contained 550 vacuum tubes — one reason ENIAC needed 18,000 tubes total.",
-                  position: SIMD3(-2.35, 1.2, -4.5),
+                  position: SIMD3(-1.9, 1.0, -3.6),
                   faceNormal: SIMD3(1, 0, 0)),
         InfoPoint(id: "info_function_tables",
                   title: "Function Tables",
                   description: "Specialized memory units storing pre-calculated mathematical constants and lookup tables. Instead of recomputing common values, operators could retrieve them instantly. Three portable function tables could each hold 104 entries of 12-digit numbers.",
                   fact: "Function tables were programmed by setting hundreds of rotary dial switches by hand — a painstaking process that could take hours.",
-                  position: SIMD3(2.35, 1.2, -4.5),
+                  position: SIMD3(1.9, 1.0, -3.6),
                   faceNormal: SIMD3(-1, 0, 0)),
         InfoPoint(id: "info_master_programmer",
                   title: "Master Programmer",
                   description: "The sequencing unit that controlled program flow and loop counting. It directed the order of operations and could set up nested loops for iterative calculations. Programming required physically reconnecting hundreds of cables between panels.",
                   fact: "Reprogramming ENIAC could take days of rewiring. In 1948, a stored-program modification allowed instructions to be stored in the function tables instead.",
-                  position: SIMD3(-2.35, 1.2, -7.5),
+                  position: SIMD3(-1.9, 1.0, -6.0),
                   faceNormal: SIMD3(1, 0, 0)),
         InfoPoint(id: "info_cycling_unit",
                   title: "Cycling Unit",
                   description: "The master clock generating timing pulses that synchronized all of ENIAC's operations. Running at 100 kHz — 100,000 pulses per second — it ensured every component executed instructions in lockstep. ENIAC could perform 5,000 additions per second.",
                   fact: "ENIAC was roughly 1,000 times faster than existing electromechanical calculators, completing in seconds what previously took days.",
-                  position: SIMD3(0, 1.2, -8.6),
+                  position: SIMD3(0.0, 1.0, -6.9),
                   faceNormal: SIMD3(0, 0, 1)),
         InfoPoint(id: "info_initiating_unit",
                   title: "Initiating Unit",
                   description: "The control panel where operators started and monitored program execution. It contained switches for launching calculations, single-stepping through operations, and reading machine status. This was the primary human interface to the computer.",
                   fact: "Six women — Kay McNulty, Betty Jennings, Betty Snyder, Marlyn Meltzer, Fran Bilas, and Ruth Lichterman — were ENIAC's first programmers, configuring it for ballistic trajectory calculations.",
-                  position: SIMD3(1.5, 1.2, -8.6),
+                  position: SIMD3(1.2, 1.0, -6.9),
                   faceNormal: SIMD3(0, 0, 1)),
         InfoPoint(id: "info_portable_unit",
                   title: "Portable Function Table",
                   description: "A free-standing wheeled cabinet that could be rolled up and connected to the main ENIAC frame. It provided additional memory and function storage, and could be swapped out with different configurations for different problems.",
                   fact: "The portable design was remarkably forward-thinking — it introduced modularity to computing years before it became standard practice.",
-                  position: SIMD3(0, 0.9, -3.7),
+                  position: SIMD3(0.0, 0.7, -3.0),
                   faceNormal: SIMD3(0, 0, 1)),
     ]
 
@@ -83,6 +83,7 @@ struct ImmersiveView: View {
         let controlTextures: [TextureResource]
         let posterTextures: [TextureResource]
         let rowTextures: [TextureResource]
+        let historyTextures: [TextureResource]
     }
 
     private struct BlinkLight {
@@ -145,11 +146,12 @@ struct ImmersiveView: View {
             if let bounds = eniacBounds {
                 let layout = roomLayout(for: bounds)
                 anchor.addChild(makeOfficeEnvironment(layout: layout,
-                                                     posterTextures: posterTextures))
+                                                     posterTextures: posterTextures,
+                                                     historyTextures: textures.historyTextures))
             }
             content.add(anchor)
 
-            // Add info buttons and pre-create hidden panel anchors
+            // Info buttons
             for info in Self.infoPoints {
                 let button = makeInfoButton(info: info)
                 anchor.addChild(button)
@@ -166,7 +168,6 @@ struct ImmersiveView: View {
                 }
             }
         } update: { content, attachments in
-            // Show/hide info panels based on activeInfoID
             for info in Self.infoPoints {
                 let panelName = "infopanel_\(info.id)"
                 for entity in content.entities {
@@ -189,13 +190,9 @@ struct ImmersiveView: View {
             SpatialTapGesture()
                 .targetedToAnyEntity()
                 .onEnded { value in
-                    guard let name = findInfoParentName(entity: value.entity) else { return }
-                    let infoID = name.replacingOccurrences(of: "btn_", with: "")
-                    if activeInfoID == infoID {
-                        activeInfoID = nil
-                    } else {
-                        activeInfoID = infoID
-                    }
+                    guard let infoName = findInfoParentName(entity: value.entity) else { return }
+                    let infoID = infoName.replacingOccurrences(of: "btn_", with: "")
+                    activeInfoID = activeInfoID == infoID ? nil : infoID
                 }
         )
         .onAppear {
@@ -257,9 +254,9 @@ struct ImmersiveView: View {
         let basePanelCount = 8
         let totalPanels = sidePanelCount * 2 + basePanelCount
 
-        let panelWidth: Float = 0.6
-        let panelHeight: Float = 2.4
-        let panelDepth: Float = 0.9
+        let panelWidth: Float = 0.61
+        let panelHeight: Float = 2.44
+        let panelDepth: Float = 0.61
         let faceDepth: Float = 0.03
         let bulbRadius: Float = 0.016
         let floorClearance: Float = 0.01
@@ -433,21 +430,21 @@ struct ImmersiveView: View {
         // Use same Y as the tuned side panels
         let backPanelZ = backZ + lightPanelFaceOffset
         let tunedY: Float = 2.05
-        let lp1 = makeLightPanel(position: SIMD3(1.4943672, 2.0489478, -8.615842),
+        let lp1 = makeLightPanel(position: SIMD3(-0.9218678, 2.055121, -8.912018),
                                   faceNormal: SIMD3(0, 0, 1), name: "lp_back_left")
         root.addChild(lp1)
-        let lp2 = makeLightPanel(position: SIMD3(2.1103811, 2.0489266, -8.617195),
+        let lp2 = makeLightPanel(position: SIMD3(1.5449044, 2.080772, -8.898484),
                                   faceNormal: SIMD3(0, 0, 1), name: "lp_back_right")
         root.addChild(lp2)
         
         // Left side panel - facing right (positive X), flush with left leg cabinets
         let sidePanelZ = backZ + 3.0 * panelPitch
-        let lp3 = makeLightPanel(position: SIMD3(-2.3509514, 2.0560832, -7.3134885),
+        let lp3 = makeLightPanel(position: SIMD3(-2.3985064, 2.0809224, -5.5989885),
                                   faceNormal: SIMD3(1, 0, 0), name: "lp_left")
         root.addChild(lp3)
         
         // Right side panel - facing left (negative X), flush with right leg cabinets
-        let lp4 = makeLightPanel(position: SIMD3(2.3459857, 2.045791, -7.3094997),
+        let lp4 = makeLightPanel(position: SIMD3(2.3982484, 2.0847638, -4.3216662),
                                   faceNormal: SIMD3(-1, 0, 0), name: "lp_right")
         root.addChild(lp4)
 
@@ -467,6 +464,32 @@ struct ImmersiveView: View {
             if let found = realityKitContentBundle.urls(forResourcesWithExtension: fileExtension,
                                                         subdirectory: nil) {
                 urls.append(contentsOf: found)
+            }
+        }
+
+        // Load History photos — bundle flattens subdirectories, so load by known filenames
+        let historyFileNames = [
+            ("500004289-03-01", "jpg"),
+            ("eckert-mauchly", "jpg"),
+            ("ENIAC-1946.jpg", "png"),
+            ("GettyImages-3243534-56b008303df78cf772cb3865", "jpg"),
+            ("Glen_Beck_and_Betty_Snyder_program_the_ENIAC_in_building_328_at_the_Ballistic_Research_Laboratory", "jpg"),
+            ("images", "jpeg"),
+            ("less-than-p-greater-than-programmers-at-aberdeen-proving-grounds-configure-eniacs-function-tables-which-acted-as-a-form-of-read-only-memory-less-than-p-greater-than.jpg", "png"),
+            ("presper-eckert-e1524609142180", "jpg"),
+            ("Two_women_operating_ENIAC_(full_resolution)", "jpg"),
+            ("Wiring-the-ENIAC-with-a-New-Program-575x375", "png"),
+            ("women-computers-1024x768", "jpg"),
+        ]
+        var historyTextures: [TextureResource] = []
+        for (name, ext) in historyFileNames {
+            if let url = realityKitContentBundle.url(forResource: name, withExtension: ext) {
+                if let texture = try? TextureResource.load(contentsOf: url) {
+                    historyTextures.append(texture)
+                    print("  Loaded history photo: \(name).\(ext)")
+                }
+            } else {
+                print("  History photo not found: \(name).\(ext)")
             }
         }
 
@@ -510,11 +533,12 @@ struct ImmersiveView: View {
         if posterTextures.isEmpty {
             print("No ENIAC poster textures found in Resources/Photographs.")
         }
-        print("Loaded ENIAC textures: panels=\(panelTextures.count) controls=\(controlTextures.count) posters=\(posterTextures.count) rows=\(rowTextures.count)")
+        print("Loaded ENIAC textures: panels=\(panelTextures.count) controls=\(controlTextures.count) posters=\(posterTextures.count) rows=\(rowTextures.count) history=\(historyTextures.count)")
         return PanelTextures(panelTextures: panelTextures,
                              controlTextures: controlTextures,
                              posterTextures: posterTextures,
-                             rowTextures: rowTextures)
+                             rowTextures: rowTextures,
+                             historyTextures: historyTextures)
     }
 
     private func makeCenterUnits(panelWidth: Float,
@@ -523,75 +547,110 @@ struct ImmersiveView: View {
                                  centerZ: Float,
                                  floorClearance: Float) -> Entity {
         let root = Entity()
-        let unitWidth: Float = 1.2  // 60% of 2.0
-        let unitDepth: Float = 0.3  // 60% of 0.5
-        let unitHeight: Float = 1.2  // 60% of 2.0
-        let wheelRadius: Float = 0.03  // 60% of 0.05
-        let wheelOffsetX = unitWidth * 0.45
-        let wheelOffsetZ = unitDepth * 0.45
-        let baseY = unitHeight * 0.5 + floorClearance + wheelRadius * 2
+        
+        // Historical portable function table: ~1.2m wide × 1.7m tall × 0.3m deep panel
+        // on an open steel frame with large caster wheels
+        let tableWidth: Float = 1.2
+        let tableDepth: Float = 0.25
+        let panelFaceHeight: Float = 1.4
+        let legHeight: Float = 0.35
+        let frameThickness: Float = 0.06
+        let casterRadius: Float = 0.06
+        let topCapHeight: Float = 0.08
+        let totalHeight = legHeight + panelFaceHeight + topCapHeight
         
         // Load free-standing unit texture
         var freestandingTexture: TextureResource?
-        // Try both search methods like loadPanelTextures does
         if let url = realityKitContentBundle.url(forResource: "free-standing-texture", withExtension: "png", subdirectory: "Photographs") {
             freestandingTexture = try? TextureResource.load(contentsOf: url)
-            print("Loaded free-standing texture from Photographs: \(url.lastPathComponent)")
         } else if let url = realityKitContentBundle.url(forResource: "free-standing-texture", withExtension: "png", subdirectory: nil) {
             freestandingTexture = try? TextureResource.load(contentsOf: url)
-            print("Loaded free-standing texture from root: \(url.lastPathComponent)")
-        } else {
-            print("Failed to find free-standing-texture.png in bundle")
         }
         
-        let frameMaterial = SimpleMaterial(color: UIColor(white: 0.2, alpha: 1.0),
-                                           roughness: 0.85,
-                                           isMetallic: false)
-        let mesh = MeshResource.generateBox(size: SIMD3(unitWidth, unitHeight, unitDepth))
+        let darkFrame = SimpleMaterial(color: UIColor(white: 0.12, alpha: 1.0),
+                                        roughness: 0.85, isMetallic: false)
+        let casterMat = SimpleMaterial(color: UIColor(white: 0.08, alpha: 1.0),
+                                        roughness: 0.5, isMetallic: true)
         
-        let wheelMaterial = SimpleMaterial(color: UIColor(white: 0.1, alpha: 1.0),
-                                            roughness: 0.7,
-                                            isMetallic: false)
-        let wheelMesh = MeshResource.generateCylinder(height: 0.02, radius: wheelRadius)
-        let wheelOffsets = [
-            SIMD3(-wheelOffsetX, -unitHeight * 0.5 - wheelRadius, -wheelOffsetZ),
-            SIMD3(wheelOffsetX, -unitHeight * 0.5 - wheelRadius, -wheelOffsetZ),
-            SIMD3(-wheelOffsetX, -unitHeight * 0.5 - wheelRadius, wheelOffsetZ),
-            SIMD3(wheelOffsetX, -unitHeight * 0.5 - wheelRadius, wheelOffsetZ)
-        ]
-        
-        // Single unit in center of U, angled towards user, positioned near back wall
-        let unit = ModelEntity(mesh: mesh, materials: [frameMaterial])
-        unit.position = SIMD3(0, baseY, centerZ * 2.0)
-        unit.orientation = simd_quatf(angle: 0.6, axis: SIMD3(0, 1, 0))
-        unit.components.set(GroundingShadowComponent(castsShadow: true))
-        
-        // Add textured front face (largest face: width x height)
-        if let texture = freestandingTexture {
-            let faceMesh = MeshResource.generatePlane(width: unitWidth, height: unitHeight)
-            var faceMaterial = UnlitMaterial()
-            faceMaterial.color = .init(tint: .white, texture: MaterialParameters.Texture(texture))
-            let face = ModelEntity(mesh: faceMesh, materials: [faceMaterial])
-            face.position = SIMD3(0, 0, unitDepth * 0.5 + 0.01)
-            unit.addChild(face)
+        func makeOneTable(position: SIMD3<Float>, angle: Float) -> Entity {
+            let table = Entity()
+            let baseY = floorClearance + casterRadius * 2
+            
+            // Base frame — horizontal bar at bottom
+            let baseMesh = MeshResource.generateBox(size: SIMD3(tableWidth + frameThickness, frameThickness, tableDepth + frameThickness))
+            let baseBar = ModelEntity(mesh: baseMesh, materials: [darkFrame])
+            baseBar.position = SIMD3(0, baseY, 0)
+            table.addChild(baseBar)
+            
+            // Two vertical side posts
+            let postHeight = legHeight + panelFaceHeight + topCapHeight
+            let postMesh = MeshResource.generateBox(size: SIMD3(frameThickness, postHeight, tableDepth))
+            for side: Float in [-1, 1] {
+                let post = ModelEntity(mesh: postMesh, materials: [darkFrame])
+                post.position = SIMD3(side * (tableWidth * 0.5), baseY + postHeight * 0.5, 0)
+                table.addChild(post)
+            }
+            
+            // Top cap
+            let topMesh = MeshResource.generateBox(size: SIMD3(tableWidth + frameThickness, topCapHeight, tableDepth + 0.02))
+            let topCap = ModelEntity(mesh: topMesh, materials: [darkFrame])
+            topCap.position = SIMD3(0, baseY + postHeight - topCapHeight * 0.5, 0)
+            table.addChild(topCap)
+            
+            // Main panel face (the dial/switch area)
+            let faceMesh = MeshResource.generateBox(size: SIMD3(tableWidth - frameThickness, panelFaceHeight, tableDepth - 0.02))
+            let faceBody = ModelEntity(mesh: faceMesh, materials: [darkFrame])
+            faceBody.position = SIMD3(0, baseY + legHeight + panelFaceHeight * 0.5, 0)
+            table.addChild(faceBody)
+            
+            // Apply texture overlay on front face
+            if let texture = freestandingTexture {
+                let overlayMesh = MeshResource.generatePlane(width: tableWidth - frameThickness * 2,
+                                                              height: panelFaceHeight - 0.04)
+                var overlayMat = UnlitMaterial()
+                overlayMat.color = .init(tint: .white, texture: MaterialParameters.Texture(texture))
+                let overlay = ModelEntity(mesh: overlayMesh, materials: [overlayMat])
+                overlay.position = SIMD3(0, baseY + legHeight + panelFaceHeight * 0.5,
+                                          tableDepth * 0.5 + 0.005)
+                table.addChild(overlay)
+            }
+            
+            // 4 caster wheels
+            let casterMesh = MeshResource.generateCylinder(height: 0.025, radius: casterRadius)
+            let casterPositions: [SIMD3<Float>] = [
+                SIMD3(-tableWidth * 0.45, casterRadius, -tableDepth * 0.35),
+                SIMD3( tableWidth * 0.45, casterRadius, -tableDepth * 0.35),
+                SIMD3(-tableWidth * 0.45, casterRadius,  tableDepth * 0.35),
+                SIMD3( tableWidth * 0.45, casterRadius,  tableDepth * 0.35),
+            ]
+            for cp in casterPositions {
+                let caster = ModelEntity(mesh: casterMesh, materials: [casterMat])
+                caster.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(0, 0, 1))
+                caster.position = cp
+                table.addChild(caster)
+            }
+            
+            // Fake shadow
+            let shadowMesh = MeshResource.generatePlane(width: tableWidth * 1.1, depth: tableDepth * 2.0)
+            var shadowMat = UnlitMaterial()
+            shadowMat.color = .init(tint: UIColor(white: 0.0, alpha: 0.3))
+            shadowMat.blending = .transparent(opacity: 1.0)
+            let shadow = ModelEntity(mesh: shadowMesh, materials: [shadowMat])
+            shadow.position = SIMD3(0, floorClearance + 0.005, 0)
+            table.addChild(shadow)
+            
+            table.components.set(GroundingShadowComponent(castsShadow: true))
+            table.position = position
+            table.orientation = simd_quatf(angle: angle, axis: SIMD3(0, 1, 0))
+            return table
         }
         
-        // Fake shadow on floor under unit
-        let shadowMesh = MeshResource.generatePlane(width: unitWidth * 1.1, depth: unitDepth * 1.5)
-        var shadowMaterial = UnlitMaterial()
-        shadowMaterial.color = .init(tint: UIColor(white: 0.0, alpha: 0.35))
-        shadowMaterial.blending = .transparent(opacity: 1.0)
-        let shadow = ModelEntity(mesh: shadowMesh, materials: [shadowMaterial])
-        shadow.position = SIMD3(0, -baseY + floorClearance + 0.005, 0)
-        unit.addChild(shadow)
-        
-        for offset in wheelOffsets {
-            let wheel = ModelEntity(mesh: wheelMesh, materials: [wheelMaterial])
-            wheel.orientation = simd_quatf(angle: .pi / 2, axis: SIMD3(1, 0, 0))
-            wheel.position = offset
-            unit.addChild(wheel)
-        }
-        root.addChild(unit)
+        // Place 2 portable function tables, parallel, rotated 35° to user, right of center
+        let tableAngle: Float = -0.6109  // 35° clockwise
+        let table1 = makeOneTable(position: SIMD3(0.6, 0, centerZ * 1.5), angle: tableAngle)
+        let table2 = makeOneTable(position: SIMD3(1.4, 0, centerZ * 1.5), angle: tableAngle)
+        root.addChild(table1)
+        root.addChild(table2)
         
         return root
     }
@@ -642,16 +701,18 @@ struct ImmersiveView: View {
     }
 
     private func makeOfficeEnvironment(layout: RoomLayout,
-                                       posterTextures: [TextureResource]) -> Entity {
+                                       posterTextures: [TextureResource],
+                                       historyTextures: [TextureResource]) -> Entity {
         let root = Entity()
-        root.addChild(makeOfficeShell(layout: layout, posterTextures: posterTextures))
+        root.addChild(makeOfficeShell(layout: layout, posterTextures: posterTextures, historyTextures: historyTextures))
         root.addChild(makeOfficeLighting(layout: layout))
         root.addChild(makeOfficeFurniture(layout: layout))
         return root
     }
 
     private func makeOfficeShell(layout: RoomLayout,
-                                 posterTextures: [TextureResource]) -> Entity {
+                                 posterTextures: [TextureResource],
+                                 historyTextures: [TextureResource]) -> Entity {
         let root = Entity()
         let wallThickness: Float = 0.12
         let floorThickness: Float = 0.002
@@ -659,12 +720,22 @@ struct ImmersiveView: View {
         let halfWidth = layout.width * 0.5
         let halfDepth = layout.depth * 0.5
 
-        let wallMaterial = SimpleMaterial(color: UIColor(white: 0.94, alpha: 1.0),
+        let wallMaterial = SimpleMaterial(color: UIColor(red: 0.92, green: 0.90, blue: 0.86, alpha: 1.0),
                                            roughness: 0.9,
                                            isMetallic: false)
-        let ceilingMaterial = SimpleMaterial(color: UIColor(white: 0.98, alpha: 1.0),
-                                              roughness: 0.95,
-                                              isMetallic: false)
+        let ceilingMaterial: SimpleMaterial
+        if let url = realityKitContentBundle.url(forResource: "ceiling_tiles",
+                                                  withExtension: "png",
+                                                  subdirectory: "Textures"),
+           let ceilTex = try? TextureResource.load(contentsOf: url) {
+            var cm = SimpleMaterial(color: .white, roughness: 0.95, isMetallic: false)
+            cm.color = .init(tint: UIColor(white: 0.98, alpha: 1.0),
+                             texture: MaterialParameters.Texture(ceilTex))
+            ceilingMaterial = cm
+        } else {
+            ceilingMaterial = SimpleMaterial(color: UIColor(white: 0.93, alpha: 1.0),
+                                             roughness: 0.95, isMetallic: false)
+        }
         let floorMaterial = makeFloorMaterial()
 
         let backWall = ModelEntity(mesh: .generateBox(size: SIMD3(layout.width, layout.height, wallThickness)),
@@ -681,6 +752,51 @@ struct ImmersiveView: View {
                                     materials: [wallMaterial])
         rightWall.position = SIMD3(layout.center.x + halfWidth, layout.height * 0.5, layout.center.z)
         root.addChild(rightWall)
+
+        // Front wall (behind user) with history photos
+        let frontWall = ModelEntity(mesh: .generateBox(size: SIMD3(layout.width, layout.height, wallThickness)),
+                                    materials: [wallMaterial])
+        frontWall.position = SIMD3(layout.center.x, layout.height * 0.5, layout.center.z + halfDepth)
+        root.addChild(frontWall)
+
+        // Hang history photographs on front wall — 10" x 8" apparent size (0.254m x 0.203m)
+        if !historyTextures.isEmpty {
+            let photoWidth: Float = 0.254
+            let photoHeight: Float = 0.203
+            let frameInset: Float = 0.02
+            let frameDepth: Float = 0.015
+            let photoY: Float = 1.5
+            let photoZ = layout.center.z + halfDepth - wallThickness * 0.5 - 0.005
+            let count = historyTextures.count
+            let spacing: Float = 0.45
+            let totalSpan = Float(count - 1) * spacing
+            let startX = layout.center.x - totalSpan * 0.5
+
+            let frameMat = SimpleMaterial(color: UIColor(white: 0.15, alpha: 1.0),
+                                          roughness: 0.4, isMetallic: false)
+
+            for (i, texture) in historyTextures.enumerated() {
+                let x = startX + Float(i) * spacing
+
+                // Dark frame
+                let frameMesh = MeshResource.generateBox(size: SIMD3(photoWidth + frameInset * 2,
+                                                                      photoHeight + frameInset * 2,
+                                                                      frameDepth))
+                let frame = ModelEntity(mesh: frameMesh, materials: [frameMat])
+                frame.position = SIMD3(x, photoY, photoZ)
+                root.addChild(frame)
+
+                // Photo face
+                let faceMesh = MeshResource.generatePlane(width: photoWidth, height: photoHeight)
+                var faceMat = UnlitMaterial()
+                faceMat.color = .init(tint: .white, texture: MaterialParameters.Texture(texture))
+                let face = ModelEntity(mesh: faceMesh, materials: [faceMat])
+                // Rotate to face -Z (towards user) and position in front of frame
+                face.orientation = simd_quatf(angle: .pi, axis: SIMD3(0, 1, 0))
+                face.position = SIMD3(x, photoY, photoZ - frameDepth * 0.5 - 0.001)
+                root.addChild(face)
+            }
+        }
 
         let ceiling = ModelEntity(mesh: .generateBox(size: SIMD3(layout.width, wallThickness, layout.depth)),
                                   materials: [ceilingMaterial])
@@ -732,25 +848,16 @@ struct ImmersiveView: View {
     }
 
     private func makeFloorMaterial() -> SimpleMaterial {
-        var material = SimpleMaterial(color: .white, roughness: 0.7, isMetallic: false)
+        var material = SimpleMaterial(color: .white, roughness: 0.85, isMetallic: false)
         
-        if let url = realityKitContentBundle.url(forResource: "floor_checker",
+        if let url = realityKitContentBundle.url(forResource: "floor_concrete",
                                                   withExtension: "png",
                                                   subdirectory: "Textures"),
            let texture = try? TextureResource.load(contentsOf: url) {
             material.color = .init(tint: UIColor(white: 0.95, alpha: 1.0),
                                    texture: MaterialParameters.Texture(texture))
-            print("Loaded floor checker texture")
-        } else if let url = realityKitContentBundle.url(forResource: "floor_checker",
-                                                         withExtension: "png",
-                                                         subdirectory: nil),
-                  let texture = try? TextureResource.load(contentsOf: url) {
-            material.color = .init(tint: UIColor(white: 0.95, alpha: 1.0),
-                                   texture: MaterialParameters.Texture(texture))
-            print("Loaded floor checker texture from root")
         } else {
-            material.color = .init(tint: UIColor(white: 0.92, alpha: 1.0))
-            print("Failed to load floor checker texture, using fallback")
+            material.color = .init(tint: UIColor(white: 0.55, alpha: 1.0))
         }
         
         return material
@@ -763,7 +870,7 @@ struct ImmersiveView: View {
         // Main overhead directional light with shadows
         let directional = DirectionalLight()
         directional.light.color = warmLight
-        directional.light.intensity = 2000
+        directional.light.intensity = 3500
         directional.shadow = DirectionalLightComponent.Shadow(maximumDistance: 35.0, depthBias: 0.5)
         directional.position = SIMD3(layout.center.x,
                                      layout.height,
@@ -773,40 +880,77 @@ struct ImmersiveView: View {
                          relativeTo: nil)
         root.addChild(directional)
 
-        // Add fluorescent ceiling lights - visual fixtures only, directional provides illumination
-        let fixtureWidth: Float = 1.2
-        let fixtureDepth: Float = 0.3
-        let fixtureHeight: Float = 0.08
-        let fixtureY = layout.height - fixtureHeight * 0.5 - 0.05
+        // Ambient fill light to brighten floor and ceiling
+        let ambient = PointLight()
+        ambient.light.color = warmLight
+        ambient.light.intensity = 12000
+        ambient.light.attenuationRadius = 25.0
+        ambient.position = SIMD3(layout.center.x, layout.height * 0.5, layout.center.z)
+        root.addChild(ambient)
+
+        // Circular ceiling lights and ventilation vents (period-appropriate)
+        let lightRadius: Float = 0.2
+        let lightThickness: Float = 0.04
+        let ventRadius: Float = 0.35
+        let ventThickness: Float = 0.03
+        let fixtureY = layout.height - 0.06
         
-        let fixtureMaterial = SimpleMaterial(color: UIColor(white: 0.95, alpha: 1.0),
-                                              roughness: 0.3,
-                                              isMetallic: false)
+        let lightMesh = MeshResource.generateCylinder(height: lightThickness, radius: lightRadius)
+        let ventMesh = MeshResource.generateCylinder(height: ventThickness, radius: ventRadius)
+        
         let emissiveMaterial = UnlitMaterial(color: UIColor(white: 0.98, alpha: 1.0))
+        let ventMaterial = SimpleMaterial(color: UIColor(white: 0.85, alpha: 1.0),
+                                          roughness: 0.6, isMetallic: true)
+        let ventGrilleMaterial = SimpleMaterial(color: UIColor(white: 0.7, alpha: 1.0),
+                                                 roughness: 0.4, isMetallic: true)
         
-        // Grid of fluorescent fixtures (4 rows x 3 columns)
-        let rows = 4
-        let cols = 3
-        let spacingX = layout.width / Float(cols + 1)
-        let spacingZ = layout.depth / Float(rows + 1)
+        // Grid: lights in a 5x4 pattern, vents in a 3x2 pattern offset
+        let lightRows = 5
+        let lightCols = 4
+        let spacingX = layout.width / Float(lightCols + 1)
+        let spacingZ = layout.depth / Float(lightRows + 1)
         
-        for row in 0..<rows {
-            for col in 0..<cols {
+        for row in 0..<lightRows {
+            for col in 0..<lightCols {
                 let x = layout.center.x - layout.width * 0.5 + spacingX * Float(col + 1)
                 let z = layout.center.z - layout.depth * 0.5 + spacingZ * Float(row + 1)
                 
-                // Fixture housing
-                let fixtureMesh = MeshResource.generateBox(size: SIMD3(fixtureWidth, fixtureHeight, fixtureDepth))
-                let fixture = ModelEntity(mesh: fixtureMesh, materials: [fixtureMaterial])
-                fixture.position = SIMD3(x, fixtureY, z)
-                root.addChild(fixture)
+                let light = ModelEntity(mesh: lightMesh, materials: [emissiveMaterial])
+                light.position = SIMD3(x, fixtureY, z)
+                root.addChild(light)
                 
-                // Emissive panel below fixture
-                let panelThickness: Float = 0.01
-                let panelMesh = MeshResource.generateBox(size: SIMD3(fixtureWidth * 0.95, panelThickness, fixtureDepth * 0.95))
-                let panel = ModelEntity(mesh: panelMesh, materials: [emissiveMaterial])
-                panel.position = SIMD3(0, -fixtureHeight * 0.5 - panelThickness * 0.5 - 0.005, 0)
-                fixture.addChild(panel)
+                // Subtle ring around the light
+                let ringMesh = MeshResource.generateCylinder(height: lightThickness * 0.5,
+                                                              radius: lightRadius + 0.02)
+                let ringMat = SimpleMaterial(color: UIColor(white: 0.9, alpha: 1.0),
+                                             roughness: 0.5, isMetallic: true)
+                let ring = ModelEntity(mesh: ringMesh, materials: [ringMat])
+                ring.position = SIMD3(x, fixtureY + 0.001, z)
+                root.addChild(ring)
+            }
+        }
+        
+        // Larger circular ventilation vents between lights
+        let ventRows = 3
+        let ventCols = 2
+        let ventSpacingX = layout.width / Float(ventCols + 1)
+        let ventSpacingZ = layout.depth / Float(ventRows + 1)
+        for row in 0..<ventRows {
+            for col in 0..<ventCols {
+                let x = layout.center.x - layout.width * 0.5 + ventSpacingX * Float(col + 1)
+                let z = layout.center.z - layout.depth * 0.5 + ventSpacingZ * Float(row + 1)
+                
+                // Vent body
+                let vent = ModelEntity(mesh: ventMesh, materials: [ventMaterial])
+                vent.position = SIMD3(x, fixtureY + 0.005, z)
+                root.addChild(vent)
+                
+                // Inner grille circle
+                let grilleMesh = MeshResource.generateCylinder(height: ventThickness * 0.3,
+                                                                radius: ventRadius * 0.7)
+                let grille = ModelEntity(mesh: grilleMesh, materials: [ventGrilleMaterial])
+                grille.position = SIMD3(x, fixtureY - 0.005, z)
+                root.addChild(grille)
             }
         }
         return root
