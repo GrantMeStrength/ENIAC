@@ -1077,22 +1077,8 @@ struct ImmersiveView: View {
         let halfWidth = layout.width * 0.5
         let halfDepth = layout.depth * 0.5
 
-        let wallMaterial = SimpleMaterial(color: UIColor(red: 0.92, green: 0.90, blue: 0.86, alpha: 1.0),
-                                           roughness: 0.9,
-                                           isMetallic: false)
-        let ceilingMaterial: SimpleMaterial
-        if let url = realityKitContentBundle.url(forResource: "ceiling_tiles",
-                                                  withExtension: "png",
-                                                  subdirectory: "Textures"),
-           let ceilTex = try? TextureResource.load(contentsOf: url) {
-            var cm = SimpleMaterial(color: .white, roughness: 0.95, isMetallic: false)
-            cm.color = .init(tint: UIColor(white: 0.98, alpha: 1.0),
-                             texture: MaterialParameters.Texture(ceilTex))
-            ceilingMaterial = cm
-        } else {
-            ceilingMaterial = SimpleMaterial(color: UIColor(white: 0.93, alpha: 1.0),
-                                             roughness: 0.95, isMetallic: false)
-        }
+        let wallMaterial = makeWallMaterial()
+        let ceilingMaterial = makeCeilingMaterial()
         let floorMaterial = makeFloorMaterial()
 
         let backWall = ModelEntity(mesh: .generateBox(size: SIMD3(layout.width, layout.height, wallThickness)),
@@ -1259,20 +1245,223 @@ struct ImmersiveView: View {
         return root
     }
 
-    private func makeFloorMaterial() -> SimpleMaterial {
-        var material = SimpleMaterial(color: .white, roughness: 0.85, isMetallic: false)
+    private func makeFloorMaterial() -> PhysicallyBasedMaterial {
+        var material = PhysicallyBasedMaterial()
         
-        if let url = realityKitContentBundle.url(forResource: "floor_concrete",
-                                                  withExtension: "png",
-                                                  subdirectory: "Textures"),
-           let texture = try? TextureResource.load(contentsOf: url) {
-            material.color = .init(tint: UIColor(white: 0.95, alpha: 1.0),
-                                   texture: MaterialParameters.Texture(texture))
-        } else {
-            material.color = .init(tint: UIColor(white: 0.55, alpha: 1.0))
+        // Generate procedural concrete-like texture
+        let floorTexture = generateFloorTexture()
+        let floorNormal = generateFloorNormalMap()
+        
+        material.baseColor = .init(tint: UIColor(red: 0.45, green: 0.42, blue: 0.38, alpha: 1.0),
+                                   texture: floorTexture.map { MaterialParameters.Texture($0) })
+        material.roughness = .init(floatLiteral: 0.85)
+        material.metallic = .init(floatLiteral: 0.0)
+        
+        if let normalTex = floorNormal {
+            material.normal = .init(texture: MaterialParameters.Texture(normalTex))
         }
         
         return material
+    }
+    
+    private func makeWallMaterial() -> PhysicallyBasedMaterial {
+        var material = PhysicallyBasedMaterial()
+        
+        // Generate subtle wall texture with paint imperfections
+        let wallTexture = generateWallTexture()
+        
+        material.baseColor = .init(tint: UIColor(red: 0.88, green: 0.85, blue: 0.80, alpha: 1.0),
+                                   texture: wallTexture.map { MaterialParameters.Texture($0) })
+        material.roughness = .init(floatLiteral: 0.92)
+        material.metallic = .init(floatLiteral: 0.0)
+        
+        return material
+    }
+    
+    private func makeCeilingMaterial() -> PhysicallyBasedMaterial {
+        var material = PhysicallyBasedMaterial()
+        
+        // Try to load ceiling tile texture, else generate procedural
+        if let url = realityKitContentBundle.url(forResource: "ceiling_tiles",
+                                                  withExtension: "png",
+                                                  subdirectory: "Textures"),
+           let ceilTex = try? TextureResource.load(contentsOf: url) {
+            material.baseColor = .init(tint: UIColor(white: 0.95, alpha: 1.0),
+                                       texture: MaterialParameters.Texture(ceilTex))
+        } else {
+            // Generate procedural ceiling tile texture with many tiles
+            let ceilingTexture = generateCeilingTexture()
+            if let tex = ceilingTexture {
+                material.baseColor = .init(tint: UIColor(white: 0.92, alpha: 1.0),
+                                           texture: MaterialParameters.Texture(tex))
+            } else {
+                material.baseColor = .init(tint: UIColor(white: 0.92, alpha: 1.0))
+            }
+        }
+        
+        // Scale UVs to tile the texture across the ceiling
+        material.textureCoordinateTransform = .init(scale: SIMD2<Float>(4, 4))
+        
+        material.roughness = .init(floatLiteral: 0.95)
+        material.metallic = .init(floatLiteral: 0.0)
+        
+        return material
+    }
+    
+    private func generateFloorTexture() -> TextureResource? {
+        let size = 512
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        
+        for y in 0..<size {
+            for x in 0..<size {
+                let i = (y * size + x) * 4
+                
+                // Base concrete gray with subtle variation
+                let baseGray: UInt8 = 140
+                let noise1 = Int.random(in: -15...15)
+                let noise2 = Int.random(in: -8...8)
+                
+                // Add subtle stains and wear patterns
+                let stainChance = Double.random(in: 0...1)
+                let stain: Int = stainChance < 0.02 ? Int.random(in: -25...0) : 0
+                
+                // Subtle tile grid lines (4 tiles across)
+                let tileSize = size / 4
+                let onGridX = (x % tileSize) < 2 || (x % tileSize) > tileSize - 3
+                let onGridY = (y % tileSize) < 2 || (y % tileSize) > tileSize - 3
+                let gridDarken: Int = (onGridX || onGridY) ? -12 : 0
+                
+                let gray = UInt8(clamping: Int(baseGray) + noise1 + noise2 + stain + gridDarken)
+                pixels[i] = gray
+                pixels[i + 1] = gray
+                pixels[i + 2] = UInt8(clamping: Int(gray) - 3)  // Slightly warmer
+                pixels[i + 3] = 255
+            }
+        }
+        
+        return createTextureFromPixels(pixels, size: size)
+    }
+    
+    private func generateFloorNormalMap() -> TextureResource? {
+        let size = 512
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        
+        for y in 0..<size {
+            for x in 0..<size {
+                let i = (y * size + x) * 4
+                
+                // Subtle surface bumps
+                let bumpX = Double.random(in: -0.03...0.03)
+                let bumpY = Double.random(in: -0.03...0.03)
+                
+                // Tile grid creates slight height variation
+                let tileSize = size / 4
+                let nearEdgeX = abs((x % tileSize) - tileSize/2) > tileSize/2 - 4
+                let nearEdgeY = abs((y % tileSize) - tileSize/2) > tileSize/2 - 4
+                let edgeBump = (nearEdgeX || nearEdgeY) ? 0.08 : 0.0
+                
+                let nx = bumpX
+                let ny = bumpY + edgeBump
+                let nz = sqrt(max(0, 1.0 - nx*nx - ny*ny))
+                
+                pixels[i] = UInt8(clamping: Int((nx + 1.0) * 127.5))
+                pixels[i + 1] = UInt8(clamping: Int((ny + 1.0) * 127.5))
+                pixels[i + 2] = UInt8(clamping: Int(nz * 255))
+                pixels[i + 3] = 255
+            }
+        }
+        
+        return createTextureFromPixels(pixels, size: size, isNormal: true)
+    }
+    
+    private func generateWallTexture() -> TextureResource? {
+        let size = 256
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        
+        for y in 0..<size {
+            for x in 0..<size {
+                let i = (y * size + x) * 4
+                
+                // Warm off-white base with subtle paint texture
+                let baseR: UInt8 = 225
+                let baseG: UInt8 = 218
+                let baseB: UInt8 = 205
+                
+                // Subtle variation for paint texture
+                let noise = Int.random(in: -6...6)
+                
+                // Occasional subtle marks/scuffs
+                let scuffChance = Double.random(in: 0...1)
+                let scuff: Int = scuffChance < 0.005 ? Int.random(in: -15...0) : 0
+                
+                pixels[i] = UInt8(clamping: Int(baseR) + noise + scuff)
+                pixels[i + 1] = UInt8(clamping: Int(baseG) + noise + scuff)
+                pixels[i + 2] = UInt8(clamping: Int(baseB) + noise + scuff)
+                pixels[i + 3] = 255
+            }
+        }
+        
+        return createTextureFromPixels(pixels, size: size)
+    }
+    
+    private func generateCeilingTexture() -> TextureResource? {
+        let size = 512
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        
+        // Create 8x8 tile grid within the texture
+        let tilesPerSide = 8
+        let tileSize = size / tilesPerSide
+        
+        for y in 0..<size {
+            for x in 0..<size {
+                let i = (y * size + x) * 4
+                
+                // Tile grid lines (darker edges)
+                let localX = x % tileSize
+                let localY = y % tileSize
+                let onGridX = localX < 2 || localX > tileSize - 3
+                let onGridY = localY < 2 || localY > tileSize - 3
+                
+                let baseGray: UInt8 = (onGridX || onGridY) ? 175 : 232
+                let noise = Int.random(in: -3...3)
+                
+                // Subtle perforation pattern for acoustic tiles (small dots)
+                let dotSpacing = 6
+                let dotPattern = ((localX % dotSpacing) < 1 && (localY % dotSpacing) < 1) ? -6 : 0
+                
+                // Slight variation between tiles
+                let tileX = x / tileSize
+                let tileY = y / tileSize
+                let tileVariation = ((tileX + tileY) % 3 - 1) * 3
+                
+                let gray = UInt8(clamping: Int(baseGray) + noise + dotPattern + tileVariation)
+                pixels[i] = gray
+                pixels[i + 1] = gray
+                pixels[i + 2] = UInt8(clamping: Int(gray) + 2)  // Slightly cooler
+                pixels[i + 3] = 255
+            }
+        }
+        
+        return createTextureFromPixels(pixels, size: size)
+    }
+    
+    private func createTextureFromPixels(_ pixels: [UInt8], size: Int, isNormal: Bool = false) -> TextureResource? {
+        let data = Data(pixels)
+        guard let cgProvider = CGDataProvider(data: data as CFData) else { return nil }
+        guard let cgImage = CGImage(width: size,
+                                     height: size,
+                                     bitsPerComponent: 8,
+                                     bitsPerPixel: 32,
+                                     bytesPerRow: size * 4,
+                                     space: CGColorSpaceCreateDeviceRGB(),
+                                     bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                     provider: cgProvider,
+                                     decode: nil,
+                                     shouldInterpolate: true,
+                                     intent: .defaultIntent) else { return nil }
+        
+        let semantic: TextureResource.Semantic = isNormal ? .normal : .color
+        return try? TextureResource.generate(from: cgImage, options: .init(semantic: semantic))
     }
 
     private func makeOfficeLighting(layout: RoomLayout) -> Entity {
@@ -1300,23 +1489,15 @@ struct ImmersiveView: View {
         ambient.position = SIMD3(layout.center.x, layout.height * 0.5, layout.center.z)
         root.addChild(ambient)
 
-        // Circular ceiling lights and ventilation vents (period-appropriate)
+        // Circular ceiling lights (period-appropriate)
         let lightRadius: Float = 0.2
         let lightThickness: Float = 0.04
-        let ventRadius: Float = 0.35
-        let ventThickness: Float = 0.03
         let fixtureY = layout.height - 0.06
         
         let lightMesh = MeshResource.generateCylinder(height: lightThickness, radius: lightRadius)
-        let ventMesh = MeshResource.generateCylinder(height: ventThickness, radius: ventRadius)
-        
         let emissiveMaterial = UnlitMaterial(color: UIColor(white: 0.98, alpha: 1.0))
-        let ventMaterial = SimpleMaterial(color: UIColor(white: 0.85, alpha: 1.0),
-                                          roughness: 0.6, isMetallic: true)
-        let ventGrilleMaterial = SimpleMaterial(color: UIColor(white: 0.7, alpha: 1.0),
-                                                 roughness: 0.4, isMetallic: true)
         
-        // Grid: lights in a 5x4 pattern, vents in a 3x2 pattern offset
+        // Grid: lights in a 5x4 pattern
         let lightRows = 5
         let lightCols = 4
         let spacingX = layout.width / Float(lightCols + 1)
@@ -1342,29 +1523,6 @@ struct ImmersiveView: View {
             }
         }
         
-        // Larger circular ventilation vents between lights
-        let ventRows = 3
-        let ventCols = 2
-        let ventSpacingX = layout.width / Float(ventCols + 1)
-        let ventSpacingZ = layout.depth / Float(ventRows + 1)
-        for row in 0..<ventRows {
-            for col in 0..<ventCols {
-                let x = layout.center.x - layout.width * 0.5 + ventSpacingX * Float(col + 1)
-                let z = layout.center.z - layout.depth * 0.5 + ventSpacingZ * Float(row + 1)
-                
-                // Vent body
-                let vent = ModelEntity(mesh: ventMesh, materials: [ventMaterial])
-                vent.position = SIMD3(x, fixtureY + 0.005, z)
-                root.addChild(vent)
-                
-                // Inner grille circle
-                let grilleMesh = MeshResource.generateCylinder(height: ventThickness * 0.3,
-                                                                radius: ventRadius * 0.7)
-                let grille = ModelEntity(mesh: grilleMesh, materials: [ventGrilleMaterial])
-                grille.position = SIMD3(x, fixtureY - 0.005, z)
-                root.addChild(grille)
-            }
-        }
         return root
     }
 
