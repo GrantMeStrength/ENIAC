@@ -453,9 +453,18 @@ struct ImmersiveView: View {
                     ring.position = SIMD3(xPos, yPos, zPos - 0.001)
                     backing.addChild(ring)
                     
-                    // Digit text - lights up
+                    // Digit text - lights up with warm orange/yellow glow
+                    // Add random variation to simulate analog vacuum tube behavior
+                    let baseRed: CGFloat = 1.0
+                    let baseGreen: CGFloat = 0.75 + CGFloat.random(in: -0.08...0.08)
+                    let baseBlue: CGFloat = 0.35 + CGFloat.random(in: -0.1...0.1)
+                    let brightness: CGFloat = 0.9 + CGFloat.random(in: 0...0.1)
+                    
                     var onMaterial = UnlitMaterial()
-                    onMaterial.color = .init(tint: UIColor(red: 1.0, green: 0.95, blue: 0.7, alpha: 1.0))  // Warm glow
+                    onMaterial.color = .init(tint: UIColor(red: baseRed * brightness, 
+                                                            green: baseGreen * brightness, 
+                                                            blue: baseBlue * brightness, 
+                                                            alpha: 1.0))
                     var offMaterial = UnlitMaterial()
                     offMaterial.color = .init(tint: UIColor(white: 0.12, alpha: 1.0))  // Dim when off
                     
@@ -573,26 +582,46 @@ struct ImmersiveView: View {
         let lightPanelY = panelY + panelHeight * 0.5 - lightPanelH * 0.25
         
         // Back row panels - facing user (positive Z)
-        // Use same Y as the tuned side panels
+        // Both panels on the right side of the back wall
         let backPanelZ = backZ + lightPanelFaceOffset
         let tunedY: Float = 2.05
-        let lp1 = makeLightPanel(position: SIMD3(-0.9218678, 2.055121, -8.912018),
-                                  faceNormal: SIMD3(0, 0, 1), name: "lp_back_left")
-        root.addChild(lp1)
         let lp2 = makeLightPanel(position: SIMD3(1.5449044, 2.080772, -8.898484),
                                   faceNormal: SIMD3(0, 0, 1), name: "lp_back_right")
         root.addChild(lp2)
+        let lp1 = makeLightPanel(position: SIMD3(2.1449044, 2.055121, -8.898484),
+                                  faceNormal: SIMD3(0, 0, 1), name: "lp_back_far_right")
+        root.addChild(lp1)
         
-        // Left side panel - facing right (positive X), flush with left leg cabinets
-        let sidePanelZ = backZ + 3.0 * panelPitch
-        let lp3 = makeLightPanel(position: SIMD3(-2.3985064, 2.0809224, -5.5989885),
-                                  faceNormal: SIMD3(1, 0, 0), name: "lp_left")
-        root.addChild(lp3)
+        // Left side panels - facing right (positive X), flush with left leg cabinets
+        // Cabinet numbers 1-16 from user's perspective (1 = closest to user, 16 = at back wall)
+        // Panels needed at: 1, 5, 6, 7, 8, 10, 11, 12, 13, 14
+        // Use the original working X position from lp3
+        let leftPanelX: Float = -2.3985064
+        let leftPanelY: Float = 2.0809224
+        // Cabinet 1 is closest to user (highest Z), cabinet 16 is at back (lowest Z = backZ)
+        // Z for cabinet number n = backZ + (16 - n) * panelPitch
+        let leftPanelNumbers = [1, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15]
+        for cabinetNum in leftPanelNumbers {
+            let z = backZ + Float(sidePanelCount - cabinetNum) * panelPitch
+            let panel = makeLightPanel(position: SIMD3(leftPanelX, leftPanelY, z),
+                                        faceNormal: SIMD3(1, 0, 0), 
+                                        name: "lp_left_\(cabinetNum)")
+            root.addChild(panel)
+        }
         
-        // Right side panel - facing left (negative X), flush with right leg cabinets
-        let lp4 = makeLightPanel(position: SIMD3(2.3982484, 2.0847638, -4.3216662),
-                                  faceNormal: SIMD3(-1, 0, 0), name: "lp_right")
-        root.addChild(lp4)
+        // Right side panels - facing left (negative X), flush with right leg cabinets
+        // Cabinet 1 is closest to user, cabinet 16 is at back wall
+        // Panels needed at: 7, 8, 13, 14, 15
+        let rightPanelX: Float = 2.3982484
+        let rightPanelY: Float = 2.0847638
+        let rightPanelNumbers = [7, 8, 13, 14, 15]
+        for cabinetNum in rightPanelNumbers {
+            let z = backZ + Float(sidePanelCount - cabinetNum) * panelPitch
+            let panel = makeLightPanel(position: SIMD3(rightPanelX, rightPanelY, z),
+                                        faceNormal: SIMD3(-1, 0, 0), 
+                                        name: "lp_right_\(cabinetNum)")
+            root.addChild(panel)
+        }
 
         root.scale = SIMD3(repeating: layoutScale)
 
@@ -791,10 +820,10 @@ struct ImmersiveView: View {
             return table
         }
         
-        // Place 2 portable function tables, parallel, rotated 35° to user, right of center
-        let tableAngle: Float = -0.6109  // 35° clockwise
-        let table1 = makeOneTable(position: SIMD3(0.6, 0, centerZ * 1.5), angle: tableAngle)
-        let table2 = makeOneTable(position: SIMD3(1.4, 0, centerZ * 1.5), angle: tableAngle)
+        // Place 2 portable function tables, parallel, rotated 35° to user, left of center
+        let tableAngle: Float = 0.6109  // 35° counter-clockwise (mirrored)
+        let table1 = makeOneTable(position: SIMD3(-0.6, 0, centerZ * 1.5), angle: tableAngle)
+        let table2 = makeOneTable(position: SIMD3(-1.4, 0, centerZ * 1.5), angle: tableAngle)
         root.addChild(table1)
         root.addChild(table2)
         
