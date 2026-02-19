@@ -19,6 +19,57 @@ struct ImmersiveView: View {
     private let roomHeightMeters: Float = 3.2
     @State private var blinkLights: [BlinkLight] = []
     @State private var blinkTask: Task<Void, Never>?
+    @State private var depthDragMode = false
+    @State private var dragStartPosition: SIMD3<Float>?
+    @State private var activeInfoID: String?
+
+    private struct InfoPoint: Identifiable {
+        let id: String
+        let title: String
+        let description: String
+        let fact: String
+        let position: SIMD3<Float>
+        let faceNormal: SIMD3<Float>
+    }
+
+    private static let infoPoints: [InfoPoint] = [
+        InfoPoint(id: "info_accumulators_left",
+                  title: "Accumulators",
+                  description: "The main arithmetic units of ENIAC, capable of addition, subtraction, and number storage. Twenty accumulators worked in parallel, each storing a 10-digit decimal number using vacuum tubes. They formed the computational heart of the machine.",
+                  fact: "Each accumulator contained 550 vacuum tubes — one reason ENIAC needed 18,000 tubes total.",
+                  position: SIMD3(-2.35, 1.2, -4.5),
+                  faceNormal: SIMD3(1, 0, 0)),
+        InfoPoint(id: "info_function_tables",
+                  title: "Function Tables",
+                  description: "Specialized memory units storing pre-calculated mathematical constants and lookup tables. Instead of recomputing common values, operators could retrieve them instantly. Three portable function tables could each hold 104 entries of 12-digit numbers.",
+                  fact: "Function tables were programmed by setting hundreds of rotary dial switches by hand — a painstaking process that could take hours.",
+                  position: SIMD3(2.35, 1.2, -4.5),
+                  faceNormal: SIMD3(-1, 0, 0)),
+        InfoPoint(id: "info_master_programmer",
+                  title: "Master Programmer",
+                  description: "The sequencing unit that controlled program flow and loop counting. It directed the order of operations and could set up nested loops for iterative calculations. Programming required physically reconnecting hundreds of cables between panels.",
+                  fact: "Reprogramming ENIAC could take days of rewiring. In 1948, a stored-program modification allowed instructions to be stored in the function tables instead.",
+                  position: SIMD3(-2.35, 1.2, -7.5),
+                  faceNormal: SIMD3(1, 0, 0)),
+        InfoPoint(id: "info_cycling_unit",
+                  title: "Cycling Unit",
+                  description: "The master clock generating timing pulses that synchronized all of ENIAC's operations. Running at 100 kHz — 100,000 pulses per second — it ensured every component executed instructions in lockstep. ENIAC could perform 5,000 additions per second.",
+                  fact: "ENIAC was roughly 1,000 times faster than existing electromechanical calculators, completing in seconds what previously took days.",
+                  position: SIMD3(0, 1.2, -8.6),
+                  faceNormal: SIMD3(0, 0, 1)),
+        InfoPoint(id: "info_initiating_unit",
+                  title: "Initiating Unit",
+                  description: "The control panel where operators started and monitored program execution. It contained switches for launching calculations, single-stepping through operations, and reading machine status. This was the primary human interface to the computer.",
+                  fact: "Six women — Kay McNulty, Betty Jennings, Betty Snyder, Marlyn Meltzer, Fran Bilas, and Ruth Lichterman — were ENIAC's first programmers, configuring it for ballistic trajectory calculations.",
+                  position: SIMD3(1.5, 1.2, -8.6),
+                  faceNormal: SIMD3(0, 0, 1)),
+        InfoPoint(id: "info_portable_unit",
+                  title: "Portable Function Table",
+                  description: "A free-standing wheeled cabinet that could be rolled up and connected to the main ENIAC frame. It provided additional memory and function storage, and could be swapped out with different configurations for different problems.",
+                  fact: "The portable design was remarkably forward-thinking — it introduced modularity to computing years before it became standard practice.",
+                  position: SIMD3(0, 0.9, -3.7),
+                  faceNormal: SIMD3(0, 0, 1)),
+    ]
 
     private struct RoomLayout {
         let center: SIMD3<Float>
@@ -42,7 +93,7 @@ struct ImmersiveView: View {
     }
 
     var body: some View {
-        RealityView { content in
+        RealityView { content, attachments in
             do {
                 let immersiveContentEntity = try await Entity(named: "Immersive", in: realityKitContentBundle)
                 if let videoDock = immersiveContentEntity.findEntity(named: "Video_Dock") {
@@ -97,7 +148,56 @@ struct ImmersiveView: View {
                                                      posterTextures: posterTextures))
             }
             content.add(anchor)
+
+            // Add info buttons and pre-create hidden panel anchors
+            for info in Self.infoPoints {
+                let button = makeInfoButton(info: info)
+                anchor.addChild(button)
+
+                if let attachment = attachments.entity(for: info.id) {
+                    let panelAnchor = Entity()
+                    panelAnchor.name = "infopanel_\(info.id)"
+                    let normal = simd_normalize(info.faceNormal)
+                    panelAnchor.position = info.position + normal * 0.6 + SIMD3(0, 0.5, 0)
+                    panelAnchor.components.set(BillboardComponent())
+                    panelAnchor.addChild(attachment)
+                    panelAnchor.isEnabled = false
+                    anchor.addChild(panelAnchor)
+                }
+            }
+        } update: { content, attachments in
+            // Show/hide info panels based on activeInfoID
+            for info in Self.infoPoints {
+                let panelName = "infopanel_\(info.id)"
+                for entity in content.entities {
+                    if let panel = entity.findEntity(named: panelName) {
+                        panel.isEnabled = (info.id == activeInfoID)
+                    }
+                }
+            }
+        } attachments: {
+            ForEach(Self.infoPoints) { info in
+                Attachment(id: info.id) {
+                    InfoPanelView(title: info.title,
+                                  description: info.description,
+                                  fact: info.fact,
+                                  onDismiss: { activeInfoID = nil })
+                }
+            }
         }
+        .gesture(
+            SpatialTapGesture()
+                .targetedToAnyEntity()
+                .onEnded { value in
+                    guard let name = findInfoParentName(entity: value.entity) else { return }
+                    let infoID = name.replacingOccurrences(of: "btn_", with: "")
+                    if activeInfoID == infoID {
+                        activeInfoID = nil
+                    } else {
+                        activeInfoID = infoID
+                    }
+                }
+        )
         .onAppear {
             startBlinking()
         }
@@ -107,6 +207,49 @@ struct ImmersiveView: View {
         .onDisappear {
             blinkTask?.cancel()
         }
+    }
+
+    private func findInfoParentName(entity: Entity) -> String? {
+        var current: Entity? = entity
+        while let e = current {
+            if e.name.hasPrefix("btn_info_") { return e.name }
+            current = e.parent
+        }
+        return nil
+    }
+
+    private func makeInfoButton(info: InfoPoint) -> Entity {
+        let buttonRoot = Entity()
+        buttonRoot.name = "btn_\(info.id)"
+        buttonRoot.position = info.position
+
+        // Subtle disc with "ⓘ" style
+        let radius: Float = 0.03
+        let discThickness: Float = 0.004
+        let discMesh = MeshResource.generateCylinder(height: discThickness, radius: radius)
+        var discMaterial = PhysicallyBasedMaterial()
+        discMaterial.baseColor = .init(tint: UIColor(white: 0.15, alpha: 0.85))
+        discMaterial.roughness = .init(floatLiteral: 0.4)
+        discMaterial.metallic = .init(floatLiteral: 0.8)
+        let disc = ModelEntity(mesh: discMesh, materials: [discMaterial])
+        // Orient disc to face the info normal
+        let normal = simd_normalize(info.faceNormal)
+        disc.orientation = simd_quatf(from: SIMD3<Float>(0, 1, 0), to: normal)
+        disc.components.set(InputTargetComponent(allowedInputTypes: .all))
+        disc.components.set(CollisionComponent(shapes: [.generateSphere(radius: radius * 3.0)]))
+        disc.components.set(HoverEffectComponent())
+        buttonRoot.addChild(disc)
+
+        // Thin glowing ring around the edge
+        let ringRadius: Float = radius + 0.003
+        let ringMesh = MeshResource.generateCylinder(height: discThickness * 0.5, radius: ringRadius)
+        var ringMaterial = UnlitMaterial()
+        ringMaterial.color = .init(tint: UIColor(red: 0.5, green: 0.7, blue: 1.0, alpha: 0.4))
+        let ring = ModelEntity(mesh: ringMesh, materials: [ringMaterial])
+        ring.orientation = disc.orientation
+        buttonRoot.addChild(ring)
+
+        return buttonRoot
     }
 
     private func makeENIACLayout(textures: PanelTextures) -> (entity: Entity, blinkLights: [BlinkLight]) {
@@ -140,41 +283,67 @@ struct ImmersiveView: View {
                                                roughness: 0.9,
                                                isMetallic: false)
             let body = ModelEntity(mesh: bodyMesh, materials: [bodyMaterial])
+            body.components.set(ModelComponent(mesh: bodyMesh, materials: [bodyMaterial]))
+            body.components.set(GroundingShadowComponent(castsShadow: true))
             panel.addChild(body)
-
-            let lightOffset = panelDepth * 0.5 + faceDepth + 0.05
-
-            let bulbMesh = MeshResource.generateSphere(radius: bulbRadius)
+            
+            return panel
+        }
+        
+        func makeLightPanel(position: SIMD3<Float>, faceNormal: SIMD3<Float>, name: String) -> Entity {
+            let panelRoot = Entity()
+            panelRoot.name = name
+            let panelWidth: Float = 0.48
+            let panelHeight: Float = 0.34
+            let panelThickness: Float = 0.02
+            let lightsPerRow = 10
+            let lightRows = 10
+            let smallerBulbRadius: Float = 0.006
+            
+            // Dark backing panel - also serves as drag target
+            let backingMesh = MeshResource.generateBox(size: SIMD3(panelWidth, panelHeight, panelThickness))
+            let backingMaterial = SimpleMaterial(color: UIColor(white: 0.1, alpha: 1.0),
+                                                  roughness: 0.8,
+                                                  isMetallic: false)
+            let backing = ModelEntity(mesh: backingMesh, materials: [backingMaterial])
+            backing.name = name + "_backing"
+            backing.components.set(InputTargetComponent(allowedInputTypes: .all))
+            // Thicker collision box for reliable targeting at distance
+            backing.components.set(CollisionComponent(shapes: [.generateBox(size: SIMD3(panelWidth, panelHeight, 0.15))]))
+            panelRoot.addChild(backing)
+            
+            // Grid of 10x10 lights
+            let bulbMesh = MeshResource.generateSphere(radius: smallerBulbRadius)
             let lightColor = UIColor(white: 1.0, alpha: 1.0)
-            let lightsPerRow = 6
-            let rowCount = 2
-            let lightRowY = panelHeight * 0.32
-            let rowSpacing = panelHeight * 0.12
-            let lightRowWidth = panelWidth * 0.7
-            let startX = -lightRowWidth * 0.5
-            let spacing = lightRowWidth / Float(lightsPerRow - 1)
+            let gridSpacingX = panelWidth * 0.85 / Float(lightsPerRow - 1)
+            let gridSpacingY = panelHeight * 0.85 / Float(lightRows - 1)
+            let startOffsetX = -panelWidth * 0.85 * 0.5
+            let startOffsetY = -panelHeight * 0.85 * 0.5
             let phaseOffsetBase = blinkLights.count
-            var lightIndex = 0
-            for row in 0..<rowCount {
-                let rowY = lightRowY - Float(row) * rowSpacing
-                for index in 0..<lightsPerRow {
+            
+            for row in 0..<lightRows {
+                for col in 0..<lightsPerRow {
                     var onMaterial = UnlitMaterial()
                     onMaterial.color = .init(tint: lightColor)
                     var offMaterial = UnlitMaterial()
-                    offMaterial.color = .init(tint: UIColor(white: 0.2, alpha: 1.0))
+                    offMaterial.color = .init(tint: UIColor(white: 0.15, alpha: 1.0))
                     let bulb = ModelEntity(mesh: bulbMesh, materials: [offMaterial])
-                    bulb.position = SIMD3(startX + Float(index) * spacing,
-                                          rowY,
-                                          faceSign * lightOffset)
-                    panel.addChild(bulb)
+                    bulb.position = SIMD3(startOffsetX + Float(col) * gridSpacingX,
+                                          startOffsetY + Float(row) * gridSpacingY,
+                                          panelThickness * 0.5 + smallerBulbRadius)
+                    backing.addChild(bulb)
                     blinkLights.append(BlinkLight(entity: bulb,
                                                   onMaterial: onMaterial,
                                                   offMaterial: offMaterial,
-                                                  phaseOffset: phaseOffsetBase + lightIndex))
-                    lightIndex += 1
+                                                  phaseOffset: phaseOffsetBase + row * lightsPerRow + col))
                 }
             }
-            return panel
+            
+            panelRoot.position = position
+            // Orient the panel so the lights face the given normal direction
+            let normal = simd_normalize(faceNormal)
+            panelRoot.orientation = simd_quatf(from: SIMD3<Float>(0, 0, 1), to: normal)
+            return panelRoot
         }
 
         let root = Entity()
@@ -250,6 +419,37 @@ struct ImmersiveView: View {
                           faceNormal: SIMD3(-1, 0, 0),
                           texture: rowTexture(3 + groupIndex))
         }
+        
+        // Add 10x10 light panels on cabinet faces, flush against overlays
+        // Overlay front face is at panelDepth*0.5 + faceDepth + 0.06 from cabinet center.
+        // Place backing (thickness 0.02) so its back face just clears the overlay front.
+        let panelThicknessLP: Float = 0.02
+        let overlayFront = panelDepth * 0.5 + faceDepth + 0.06
+        let lightPanelFaceOffset = overlayFront + panelThicknessLP * 0.5 + 0.002
+        let lightPanelH: Float = 0.34
+        let lightPanelY = panelY + panelHeight * 0.5 - lightPanelH * 0.25
+        
+        // Back row panels - facing user (positive Z)
+        // Use same Y as the tuned side panels
+        let backPanelZ = backZ + lightPanelFaceOffset
+        let tunedY: Float = 2.05
+        let lp1 = makeLightPanel(position: SIMD3(1.4943672, 2.0489478, -8.615842),
+                                  faceNormal: SIMD3(0, 0, 1), name: "lp_back_left")
+        root.addChild(lp1)
+        let lp2 = makeLightPanel(position: SIMD3(2.1103811, 2.0489266, -8.617195),
+                                  faceNormal: SIMD3(0, 0, 1), name: "lp_back_right")
+        root.addChild(lp2)
+        
+        // Left side panel - facing right (positive X), flush with left leg cabinets
+        let sidePanelZ = backZ + 3.0 * panelPitch
+        let lp3 = makeLightPanel(position: SIMD3(-2.3509514, 2.0560832, -7.3134885),
+                                  faceNormal: SIMD3(1, 0, 0), name: "lp_left")
+        root.addChild(lp3)
+        
+        // Right side panel - facing left (negative X), flush with right leg cabinets
+        let lp4 = makeLightPanel(position: SIMD3(2.3459857, 2.045791, -7.3094997),
+                                  faceNormal: SIMD3(-1, 0, 0), name: "lp_right")
+        root.addChild(lp4)
 
         root.scale = SIMD3(repeating: layoutScale)
 
@@ -364,6 +564,7 @@ struct ImmersiveView: View {
         let unit = ModelEntity(mesh: mesh, materials: [frameMaterial])
         unit.position = SIMD3(0, baseY, centerZ * 2.0)
         unit.orientation = simd_quatf(angle: 0.6, axis: SIMD3(0, 1, 0))
+        unit.components.set(GroundingShadowComponent(castsShadow: true))
         
         // Add textured front face (largest face: width x height)
         if let texture = freestandingTexture {
@@ -374,6 +575,15 @@ struct ImmersiveView: View {
             face.position = SIMD3(0, 0, unitDepth * 0.5 + 0.01)
             unit.addChild(face)
         }
+        
+        // Fake shadow on floor under unit
+        let shadowMesh = MeshResource.generatePlane(width: unitWidth * 1.1, depth: unitDepth * 1.5)
+        var shadowMaterial = UnlitMaterial()
+        shadowMaterial.color = .init(tint: UIColor(white: 0.0, alpha: 0.35))
+        shadowMaterial.blending = .transparent(opacity: 1.0)
+        let shadow = ModelEntity(mesh: shadowMesh, materials: [shadowMaterial])
+        shadow.position = SIMD3(0, -baseY + floorClearance + 0.005, 0)
+        unit.addChild(shadow)
         
         for offset in wheelOffsets {
             let wheel = ModelEntity(mesh: wheelMesh, materials: [wheelMaterial])
@@ -480,6 +690,7 @@ struct ImmersiveView: View {
         let floor = ModelEntity(mesh: .generateBox(size: SIMD3(layout.width, floorThickness, layout.depth)),
                                 materials: [floorMaterial])
         floor.position = SIMD3(layout.center.x, floorY, layout.center.z)
+        floor.components.set(GroundingShadowComponent(castsShadow: false))
         root.addChild(floor)
 
         var windowMaterial = UnlitMaterial()
@@ -521,59 +732,48 @@ struct ImmersiveView: View {
     }
 
     private func makeFloorMaterial() -> SimpleMaterial {
+        var material = SimpleMaterial(color: .white, roughness: 0.7, isMetallic: false)
+        
         if let url = realityKitContentBundle.url(forResource: "floor_checker",
                                                   withExtension: "png",
                                                   subdirectory: "Textures"),
            let texture = try? TextureResource.load(contentsOf: url) {
-            var material = SimpleMaterial(color: .white, roughness: 0.2, isMetallic: false)
-            material.color = .init(tint: .white,
+            material.color = .init(tint: UIColor(white: 0.95, alpha: 1.0),
                                    texture: MaterialParameters.Texture(texture))
             print("Loaded floor checker texture")
-            return material
         } else if let url = realityKitContentBundle.url(forResource: "floor_checker",
                                                          withExtension: "png",
                                                          subdirectory: nil),
                   let texture = try? TextureResource.load(contentsOf: url) {
-            var material = SimpleMaterial(color: .white, roughness: 0.2, isMetallic: false)
-            material.color = .init(tint: .white,
+            material.color = .init(tint: UIColor(white: 0.95, alpha: 1.0),
                                    texture: MaterialParameters.Texture(texture))
             print("Loaded floor checker texture from root")
-            return material
+        } else {
+            material.color = .init(tint: UIColor(white: 0.92, alpha: 1.0))
+            print("Failed to load floor checker texture, using fallback")
         }
-        print("Failed to load floor checker texture, using fallback")
-        return SimpleMaterial(color: UIColor(white: 0.92, alpha: 1.0),
-                              roughness: 0.2,
-                              isMetallic: false)
+        
+        return material
     }
 
     private func makeOfficeLighting(layout: RoomLayout) -> Entity {
         let root = Entity()
         let warmLight = UIColor(red: 1.0, green: 0.97, blue: 0.9, alpha: 1.0)
 
+        // Main overhead directional light with shadows
         let directional = DirectionalLight()
         directional.light.color = warmLight
-        directional.light.intensity = 1200
-        directional.shadow = DirectionalLightComponent.Shadow(maximumDistance: 30.0, depthBias: 1.0)
+        directional.light.intensity = 2000
+        directional.shadow = DirectionalLightComponent.Shadow(maximumDistance: 35.0, depthBias: 0.5)
         directional.position = SIMD3(layout.center.x,
                                      layout.height,
-                                     layout.center.z + layout.depth * 0.45)
-        directional.look(at: SIMD3(layout.center.x, layout.height * 0.4, layout.center.z),
+                                     layout.center.z)
+        directional.look(at: SIMD3(layout.center.x, 0, layout.center.z),
                          from: directional.position,
                          relativeTo: nil)
         root.addChild(directional)
 
-        let fillDirectional = DirectionalLight()
-        fillDirectional.light.color = warmLight
-        fillDirectional.light.intensity = 800
-        fillDirectional.position = SIMD3(layout.center.x,
-                                         layout.height,
-                                         layout.center.z - layout.depth * 0.45)
-        fillDirectional.look(at: SIMD3(layout.center.x, layout.height * 0.4, layout.center.z),
-                             from: fillDirectional.position,
-                             relativeTo: nil)
-        root.addChild(fillDirectional)
-
-        // Add fluorescent ceiling lights
+        // Add fluorescent ceiling lights - visual fixtures only, directional provides illumination
         let fixtureWidth: Float = 1.2
         let fixtureDepth: Float = 0.3
         let fixtureHeight: Float = 0.08
@@ -584,9 +784,9 @@ struct ImmersiveView: View {
                                               isMetallic: false)
         let emissiveMaterial = UnlitMaterial(color: UIColor(white: 0.98, alpha: 1.0))
         
-        // Grid of fluorescent fixtures (8 rows x 6 columns = 48 lights)
-        let rows = 8
-        let cols = 6
+        // Grid of fluorescent fixtures (4 rows x 3 columns)
+        let rows = 4
+        let cols = 3
         let spacingX = layout.width / Float(cols + 1)
         let spacingZ = layout.depth / Float(rows + 1)
         
@@ -601,29 +801,14 @@ struct ImmersiveView: View {
                 fixture.position = SIMD3(x, fixtureY, z)
                 root.addChild(fixture)
                 
-                // Emissive panel (light-emitting surface) - positioned below fixture to avoid z-fighting
+                // Emissive panel below fixture
                 let panelThickness: Float = 0.01
                 let panelMesh = MeshResource.generateBox(size: SIMD3(fixtureWidth * 0.95, panelThickness, fixtureDepth * 0.95))
                 let panel = ModelEntity(mesh: panelMesh, materials: [emissiveMaterial])
                 panel.position = SIMD3(0, -fixtureHeight * 0.5 - panelThickness * 0.5 - 0.005, 0)
                 fixture.addChild(panel)
-                
-                // Point light from fixture
-                let light = PointLight()
-                light.light.color = warmLight
-                light.light.intensity = 300
-                light.light.attenuationRadius = max(layout.width, layout.depth) * 0.4
-                light.position = SIMD3(0, -fixtureHeight * 0.5 - 0.01, 0)
-                fixture.addChild(light)
             }
         }
-
-        let ambientFill = PointLight()
-        ambientFill.light.color = warmLight
-        ambientFill.light.intensity = 800
-        ambientFill.light.attenuationRadius = max(layout.width, layout.depth) * 2.0
-        ambientFill.position = SIMD3(layout.center.x, layout.height * 0.7, layout.center.z)
-        root.addChild(ambientFill)
         return root
     }
 
@@ -692,6 +877,56 @@ struct ImmersiveView: View {
         }
 
         return root
+    }
+}
+
+// MARK: - Info Panel View
+struct InfoPanelView: View {
+    let title: String
+    let description: String
+    let fact: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.gray)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Divider()
+                .background(Color.white.opacity(0.3))
+
+            Text(description)
+                .font(.body)
+                .foregroundColor(.white.opacity(0.9))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundColor(.yellow)
+                    .font(.callout)
+                Text(fact)
+                    .font(.callout)
+                    .foregroundColor(.yellow.opacity(0.9))
+                    .italic()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.top, 4)
+        }
+        .padding(20)
+        .frame(width: 380)
+        .background(.ultraThinMaterial)
+        .cornerRadius(16)
     }
 }
 
