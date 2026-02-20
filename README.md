@@ -16,6 +16,11 @@ The environment is designed to communicate ENIAC's physical scale, layout, and o
 - Historical photo gallery integrated into the room
 - Tuned room lighting, textures, and materials for simulator/headset viewing
 
+## Navigation
+
+- If you don't have an open space to walk around, don't worry. Look at the "hot spots" in the floor and select, and you'll be teleported close by. As a bonus, an information panel will open providing facts about ENIAC.
+    
+
 ## Screenshots
 
 <p align="center">

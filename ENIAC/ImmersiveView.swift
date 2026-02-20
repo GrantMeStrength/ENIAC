@@ -8,6 +8,7 @@
 import SwiftUI
 import RealityKit
 import RealityKitContent
+import AVFoundation
 import UIKit
 import Foundation
 
@@ -23,6 +24,8 @@ struct ImmersiveView: View {
     @State private var dragStartPosition: SIMD3<Float>?
     @State private var activeInfoID: String?
     @State private var worldAnchor: Entity?
+    @State private var ambientAudioPlayer: AVAudioPlayer?
+    @State private var infoOpenSoundPlayer: AVAudioPlayer?
 
     private struct InfoPoint: Identifiable {
         let id: String
@@ -283,17 +286,25 @@ struct ImmersiveView: View {
                     }
                     
                     // Open the info panel (or close if already open)
-                    activeInfoID = activeInfoID == infoID ? nil : infoID
+                    let willOpen = activeInfoID != infoID
+                    activeInfoID = willOpen ? infoID : nil
+                    if willOpen {
+                        playInfoOpenSound()
+                    }
                 }
         )
         .onAppear {
             startBlinking()
+            startAmbientSoundtrack()
         }
         .onChange(of: blinkLights.count) {
             startBlinking()
         }
         .onDisappear {
             blinkTask?.cancel()
+            stopAmbientSoundtrack()
+            infoOpenSoundPlayer?.stop()
+            infoOpenSoundPlayer = nil
         }
     }
 
@@ -1239,16 +1250,16 @@ struct ImmersiveView: View {
                                                   withExtension: "png",
                                                   subdirectory: "Textures"),
            let floorTex = try? TextureResource.load(contentsOf: url) {
-            material.baseColor = .init(tint: UIColor(white: 0.65, alpha: 1.0),
+            material.baseColor = .init(tint: UIColor(white: 0.28, alpha: 1.0),
                                        texture: MaterialParameters.Texture(floorTex))
         } else if let url = realityKitContentBundle.url(forResource: "floor_concrete",
                                                          withExtension: "png",
                                                          subdirectory: nil),
                   let floorTex = try? TextureResource.load(contentsOf: url) {
-            material.baseColor = .init(tint: UIColor(white: 0.65, alpha: 1.0),
+            material.baseColor = .init(tint: UIColor(white: 0.28, alpha: 1.0),
                                        texture: MaterialParameters.Texture(floorTex))
         } else {
-            material.baseColor = .init(tint: UIColor(red: 0.32, green: 0.30, blue: 0.28, alpha: 1.0))
+            material.baseColor = .init(tint: UIColor(red: 0.12, green: 0.11, blue: 0.10, alpha: 1.0))
         }
         
         // Keep texture frequency low to reduce shimmer in simulator.
@@ -1545,25 +1556,25 @@ struct ImmersiveView: View {
             // Determine number of panels and columns
             let maxPanel = blinkLights.map { $0.panelIndex }.max() ?? 0
             let columns = 10
-            
+
             // Track which digit (row 0-9) is currently lit for each column on each panel
             // Row corresponds to digit value: row 0 = digit "0", row 9 = digit "9"
             var activeDigits: [[Int]] = Array(repeating: Array(repeating: 0, count: columns), count: maxPanel + 1)
-            
+
             // Initialize with random starting values
             for panel in 0...maxPanel {
                 for col in 0..<columns {
                     activeDigits[panel][col] = Int.random(in: 0...9)
                 }
             }
-            
+
             // Set initial state - only one digit per column is on
             for light in blinkLights {
                 let isOn = light.row == activeDigits[light.panelIndex][light.column]
                 light.entity.model?.materials = [isOn ? light.onMaterial : light.offMaterial]
                 light.entity.isEnabled = true
             }
-            
+
             // Track per-column update timing for less predictable animation
             var columnTimers: [[Double]] = Array(repeating: Array(repeating: 0, count: columns), count: maxPanel + 1)
             for panel in 0...maxPanel {
@@ -1573,20 +1584,54 @@ struct ImmersiveView: View {
                 }
             }
             
+            // Occasionally let a whole panel go dark for a brief period.
+            var panelBlackoutTimers: [Double] = Array(repeating: 0, count: maxPanel + 1)
+            var panelBlackoutCooldowns: [Double] = Array(repeating: 0, count: maxPanel + 1)
+            for panel in 0...maxPanel {
+                panelBlackoutCooldowns[panel] = Double.random(in: 12.0...28.0)
+            }
+
             let tickInterval: UInt64 = 100_000_000  // 100ms tick
-            
+
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: tickInterval)
-                
+
                 // Decrement timers and update columns that are ready
                 for panel in 0...maxPanel {
+                    panelBlackoutCooldowns[panel] -= 0.1
+                    
+                    if panelBlackoutTimers[panel] > 0 {
+                        panelBlackoutTimers[panel] -= 0.1
+                        for light in blinkLights where light.panelIndex == panel {
+                            light.entity.model?.materials = [light.offMaterial]
+                        }
+                        
+                        if panelBlackoutTimers[panel] <= 0 {
+                            // Restore the panel immediately when blackout ends.
+                            for light in blinkLights where light.panelIndex == panel {
+                                let isOn = light.row == activeDigits[panel][light.column]
+                                light.entity.model?.materials = [isOn ? light.onMaterial : light.offMaterial]
+                            }
+                            panelBlackoutCooldowns[panel] = Double.random(in: 18.0...42.0)
+                        }
+                        continue
+                    }
+                    
+                    if panelBlackoutCooldowns[panel] <= 0 {
+                        panelBlackoutTimers[panel] = Double.random(in: 2.0...6.0)
+                        for light in blinkLights where light.panelIndex == panel {
+                            light.entity.model?.materials = [light.offMaterial]
+                        }
+                        continue
+                    }
+                    
                     for col in 0..<columns {
                         columnTimers[panel][col] -= 0.1
-                        
+
                         if columnTimers[panel][col] <= 0 {
                             // Change the active digit for this column
                             let oldDigit = activeDigits[panel][col]
-                            
+
                             // Usually increment/decrement, occasionally jump
                             let change: Int
                             let r = Double.random(in: 0...1)
@@ -1599,24 +1644,186 @@ struct ImmersiveView: View {
                             } else {
                                 change = Int.random(in: 0...9) - oldDigit  // Random position
                             }
-                            
+
                             var newDigit = oldDigit + change
                             // Wrap around 0-9
                             newDigit = ((newDigit % 10) + 10) % 10
                             activeDigits[panel][col] = newDigit
-                            
+
                             // Update the entities for this column
                             for light in blinkLights where light.panelIndex == panel && light.column == col {
                                 let isOn = light.row == newDigit
                                 light.entity.model?.materials = [isOn ? light.onMaterial : light.offMaterial]
                             }
-                            
+
                             // Reset timer with varied delay (slower, less predictable)
                             columnTimers[panel][col] = Double.random(in: 0.8...3.5)
                         }
                     }
                 }
             }
+        }
+    }
+
+    private func startAmbientSoundtrack() {
+        if let player = ambientAudioPlayer {
+            if !player.isPlaying { player.play() }
+            return
+        }
+
+        let audioURL = locateAmbientSoundtrackURL()
+        guard let audioURL else {
+            print("Ambient ENIAC soundtrack not found in resources.")
+            return
+        }
+
+        do {
+            let player = try AVAudioPlayer(contentsOf: audioURL)
+            player.numberOfLoops = -1
+            player.volume = 0.4
+            player.prepareToPlay()
+            player.play()
+            ambientAudioPlayer = player
+        } catch {
+            print("Failed to start ENIAC soundtrack: \(error)")
+        }
+    }
+
+    private func stopAmbientSoundtrack() {
+        ambientAudioPlayer?.stop()
+        ambientAudioPlayer = nil
+    }
+
+    private func playInfoOpenSound() {
+        if let player = infoOpenSoundPlayer {
+            player.currentTime = 0
+            player.play()
+            return
+        }
+
+        guard let audioURL = locateAudioURL(baseName: "info_open_chime") ?? generateFallbackInfoOpenChimeURL() else {
+            print("Info open chime not found in resources and fallback generation failed.")
+            return
+        }
+
+        do {
+            let player = try AVAudioPlayer(contentsOf: audioURL)
+            player.numberOfLoops = 0
+            player.volume = 0.15
+            player.prepareToPlay()
+            player.play()
+            infoOpenSoundPlayer = player
+        } catch {
+            print("Failed to play info open chime: \(error)")
+        }
+    }
+
+    private func locateAmbientSoundtrackURL() -> URL? {
+        locateAudioURL(baseName: "eniac_ambient")
+    }
+
+    private func locateAudioURL(baseName: String) -> URL? {
+        if let url = realityKitContentBundle.url(forResource: baseName, withExtension: "wav", subdirectory: "Audio") {
+            return url
+        }
+        if let url = realityKitContentBundle.url(forResource: baseName, withExtension: "wav", subdirectory: nil) {
+            return url
+        }
+        if let urls = realityKitContentBundle.urls(forResourcesWithExtension: "wav", subdirectory: nil),
+           let match = urls.first(where: { $0.lastPathComponent.lowercased().contains(baseName.lowercased()) }) {
+            return match
+        }
+        if let packageBundleURL = Bundle.main.url(forResource: "RealityKitContent_RealityKitContent", withExtension: "bundle"),
+           let packageBundle = Bundle(url: packageBundleURL),
+           let url = packageBundle.url(forResource: baseName, withExtension: "wav") {
+            return url
+        }
+
+        let allBundles = [Bundle.main] + Bundle.allBundles + Bundle.allFrameworks
+        for bundle in allBundles {
+            if let url = bundle.url(forResource: baseName, withExtension: "wav") {
+                return url
+            }
+            if let resourceURL = bundle.resourceURL,
+               let e = FileManager.default.enumerator(at: resourceURL,
+                                                      includingPropertiesForKeys: nil) {
+                for case let fileURL as URL in e {
+                    let name = fileURL.lastPathComponent.lowercased()
+                    if name == "\(baseName.lowercased()).wav" {
+                        return fileURL
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    private func generateFallbackInfoOpenChimeURL() -> URL? {
+        let outputURL = FileManager.default.temporaryDirectory.appendingPathComponent("eniac_info_open_fallback.wav")
+        if FileManager.default.fileExists(atPath: outputURL.path) {
+            return outputURL
+        }
+
+        let sampleRate: Int = 22_050
+        let duration: Double = 0.9
+        let frameCount = Int(Double(sampleRate) * duration)
+        let channels: Int = 2
+        let bytesPerSample: Int = 2
+        let byteRate = sampleRate * channels * bytesPerSample
+        let blockAlign = channels * bytesPerSample
+        let dataSize = frameCount * channels * bytesPerSample
+        let fileSize = 36 + dataSize
+
+        var data = Data()
+        func appendString(_ value: String) {
+            data.append(value.data(using: .ascii)!)
+        }
+        func appendUInt32(_ value: UInt32) {
+            var v = value.littleEndian
+            data.append(Data(bytes: &v, count: MemoryLayout<UInt32>.size))
+        }
+        func appendUInt16(_ value: UInt16) {
+            var v = value.littleEndian
+            data.append(Data(bytes: &v, count: MemoryLayout<UInt16>.size))
+        }
+
+        appendString("RIFF")
+        appendUInt32(UInt32(fileSize))
+        appendString("WAVE")
+        appendString("fmt ")
+        appendUInt32(16)
+        appendUInt16(1)  // PCM
+        appendUInt16(UInt16(channels))
+        appendUInt32(UInt32(sampleRate))
+        appendUInt32(UInt32(byteRate))
+        appendUInt16(UInt16(blockAlign))
+        appendUInt16(16)  // bits per sample
+        appendString("data")
+        appendUInt32(UInt32(dataSize))
+
+        for i in 0..<frameCount {
+            let t = Double(i) / Double(sampleRate)
+            let attack = min(1.0, t / 0.04)
+            let release = max(0.0, (duration - t) / 0.2)
+            let env = attack * release
+            let y =
+                0.62 * sin(2 * .pi * 784 * t) * exp(-2.2 * t) +
+                0.30 * sin(2 * .pi * 1174 * t) * exp(-3.0 * t) +
+                0.16 * sin(2 * .pi * 1568 * t) * exp(-4.0 * t)
+            let sample = max(-1.0, min(1.0, y * env * 0.72))
+            let intSample = Int16(sample * Double(Int16.max))
+            var left = intSample.littleEndian
+            var right = intSample.littleEndian
+            data.append(Data(bytes: &left, count: MemoryLayout<Int16>.size))
+            data.append(Data(bytes: &right, count: MemoryLayout<Int16>.size))
+        }
+
+        do {
+            try data.write(to: outputURL, options: .atomic)
+            return outputURL
+        } catch {
+            print("Failed to generate fallback info chime: \(error)")
+            return nil
         }
     }
 
@@ -1679,12 +1886,12 @@ struct InfoPanelView: View {
     let onDismiss: () -> Void
 
     // Classic 1950s-era serif typeface
-    private let serifFont = Font.custom("Times New Roman", size: 19)
-    private let serifTitleFont = Font.custom("Times New Roman", size: 26)
-    private let serifCalloutFont = Font.custom("Times New Roman", size: 16)
+    private let serifFont = Font.custom("Times New Roman", size: 38)
+    private let serifTitleFont = Font.custom("Times New Roman", size: 52)
+    private let serifCalloutFont = Font.custom("Times New Roman", size: 32)
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 24) {
             HStack {
                 Text(title)
                     .font(serifTitleFont)
@@ -1693,7 +1900,7 @@ struct InfoPanelView: View {
                 Spacer()
                 Button(action: onDismiss) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
+                        .font(.largeTitle)
                         .foregroundColor(.gray)
                 }
                 .buttonStyle(.plain)
@@ -1707,7 +1914,7 @@ struct InfoPanelView: View {
                 .foregroundColor(.white.opacity(0.9))
                 .fixedSize(horizontal: false, vertical: true)
 
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: 16) {
                 Image(systemName: "lightbulb.fill")
                     .foregroundColor(.yellow)
                     .font(.callout)
@@ -1717,12 +1924,12 @@ struct InfoPanelView: View {
                     .italic()
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.top, 4)
+            .padding(.top, 8)
         }
-        .padding(24)
-        .frame(width: 460)
+        .padding(48)
+        .frame(width: 920)
         .background(.ultraThinMaterial)
-        .cornerRadius(16)
+        .cornerRadius(32)
     }
 }
 

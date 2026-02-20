@@ -26,6 +26,7 @@ struct ENIACApp: App {
                     .environment(appModel)
             }
         }
+        .persistentSystemOverlays(.hidden)
         .windowStyle(.plain)
         .windowResizability(.contentSize)
         
