@@ -15,7 +15,11 @@ struct ENIACApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if avPlayerViewModel.isPlaying {
+            if appModel.immersiveSpaceState == .open {
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .allowsHitTesting(false)
+            } else if avPlayerViewModel.isPlaying {
                 AVPlayerView(viewModel: avPlayerViewModel)
             } else {
                 ContentView()

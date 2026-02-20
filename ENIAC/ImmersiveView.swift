@@ -53,7 +53,7 @@ struct ImmersiveView: View {
                   fact: "The accumulators could add two numbers in just 200 microseconds — about 5,000 additions per second.",
                   position: SIMD3(-1.9, 1.2, -6.2),
                   faceNormal: SIMD3(1, 0, 0),
-                  viewOffset: SIMD3(-0.5, 0, -6.2)),
+                  viewOffset: SIMD3(-0.1, 0, -5.4)),
         // Left leg - Accumulators (mid-section)
         InfoPoint(id: "info_accumulators_mid",
                   title: "Accumulators 3-10",
@@ -101,7 +101,7 @@ struct ImmersiveView: View {
                   fact: "Reprogramming ENIAC could take days of rewiring. In 1948, a stored-program modification allowed instructions to be stored in the function tables instead.",
                   position: SIMD3(-1.5, 1.2, -6.9),
                   faceNormal: SIMD3(0, 0, 1),
-                  viewOffset: SIMD3(-1.5, 0, -5.0)),
+                  viewOffset: SIMD3(-1.5, 0, -4.2)),
         // Back wall - Cycling Unit (center of back wall)
         InfoPoint(id: "info_cycling_unit",
                   title: "Cycling Unit",
@@ -109,7 +109,7 @@ struct ImmersiveView: View {
                   fact: "ENIAC was roughly 1,000 times faster than existing electromechanical calculators, completing in seconds what previously took days.",
                   position: SIMD3(0.0, 1.2, -6.9),
                   faceNormal: SIMD3(0, 0, 1),
-                  viewOffset: SIMD3(0.0, 0, -5.0)),
+                  viewOffset: SIMD3(0.0, 0, -4.2)),
         // Back wall - Initiating Unit (right side of back wall)
         InfoPoint(id: "info_initiating_unit",
                   title: "Initiating Unit",
@@ -117,15 +117,15 @@ struct ImmersiveView: View {
                   fact: "Six women — Kay McNulty, Betty Jennings, Betty Snyder, Marlyn Meltzer, Fran Bilas, and Ruth Lichterman — were ENIAC's first programmers, configuring it for ballistic trajectory calculations.",
                   position: SIMD3(1.5, 1.2, -6.9),
                   faceNormal: SIMD3(0, 0, 1),
-                  viewOffset: SIMD3(1.5, 0, -5.0)),
+                  viewOffset: SIMD3(1.5, 0, -4.2)),
         // Center of U - Portable Function Table
         InfoPoint(id: "info_portable_unit",
                   title: "Portable Function Table",
                   description: "A free-standing wheeled cabinet that could be rolled up and connected to the main ENIAC frame. It provided additional memory and function storage, and could be swapped out with different configurations for different problems.",
                   fact: "The portable design was remarkably forward-thinking — it introduced modularity to computing years before it became standard practice.",
-                  position: SIMD3(-0.8, 0.8, -3.5),
+                  position: SIMD3(-1.2, 1.1, -5.5),
                   faceNormal: SIMD3(0, 0, 1),
-                  viewOffset: SIMD3(-0.8, 0, -1.8)),
+                  viewOffset: SIMD3(-1.2, 0, -2.8)),
         // Photo wall - The Programmers (left side)
         InfoPoint(id: "info_programmers",
                   title: "The ENIAC Programmers",
@@ -170,16 +170,6 @@ struct ImmersiveView: View {
 
     var body: some View {
         RealityView { content, attachments in
-            do {
-                let immersiveContentEntity = try await Entity(named: "Immersive", in: realityKitContentBundle)
-                if let videoDock = immersiveContentEntity.findEntity(named: "Video_Dock") {
-                    videoDock.removeFromParent()
-                }
-                content.add(immersiveContentEntity)
-            } catch {
-                print("Failed to load immersive environment: \(error)")
-            }
-
             let textures = loadPanelTextures()
             let eniacEntity: Entity
             var scaleToTargetLength = false
@@ -238,16 +228,18 @@ struct ImmersiveView: View {
                     let panelAnchor = Entity()
                     panelAnchor.name = "infopanel_\(info.id)"
                     
-                    // Position panel flush against the object, offset slightly in the face normal direction
+                    // Position panel between object and viewer to avoid clipping into cabinets
                     let normal = simd_normalize(info.faceNormal)
-                    let panelOffset: Float = 0.15  // Small offset from surface
+                    let panelOffset: Float = 0.65
                     let eyeLevelY: Float = 1.55
+                    let viewerDelta = info.viewOffset - info.position
+                    let displayDirection = simd_length_squared(viewerDelta) > 0.0001 ? simd_normalize(viewerDelta) : normal
                     
-                    // Panel appears at the info point position, at eye level, slightly in front
+                    // Panel appears toward the viewing position, at eye level
                     let panelPosition = SIMD3<Float>(
-                        info.position.x + normal.x * panelOffset,
+                        info.position.x + displayDirection.x * panelOffset,
                         eyeLevelY,
-                        info.position.z + normal.z * panelOffset
+                        info.position.z + displayDirection.z * panelOffset
                     )
                     
                     panelAnchor.position = panelPosition
@@ -317,26 +309,34 @@ struct ImmersiveView: View {
     private func makeInfoButton(info: InfoPoint) -> Entity {
         let buttonRoot = Entity()
         buttonRoot.name = "btn_\(info.id)"
-        // Place on floor, at the viewOffset position (where user will stand)
         buttonRoot.position = SIMD3(info.viewOffset.x, 0.005, info.viewOffset.z)
 
-        // Subtle floor marker with hover highlight
-        let radius: Float = 0.08
+        // Subtle floor marker
+        let radius: Float = 0.07
         let thickness: Float = 0.003
-        
-        // Use a slightly brighter material so hover effect is visible
+
         let discMesh = MeshResource.generateCylinder(height: thickness, radius: radius)
-        var discMaterial = SimpleMaterial(color: UIColor(white: 0.35, alpha: 0.7),
+        var discMaterial = SimpleMaterial(color: UIColor(white: 0.35, alpha: 0.55),
                                            roughness: 0.9,
                                            isMetallic: false)
         let disc = ModelEntity(mesh: discMesh, materials: [discMaterial])
         disc.position.y = thickness * 0.5
-        
+
         // Collision and input with hover effect
         disc.components.set(InputTargetComponent(allowedInputTypes: .all))
         disc.components.set(CollisionComponent(shapes: [.generateBox(size: SIMD3(radius * 3, 0.15, radius * 3))]))
         disc.components.set(HoverEffectComponent())
         buttonRoot.addChild(disc)
+
+        // Subtle colored ring — faint at rest, noticeable when hover highlight activates
+        let ringMesh = MeshResource.generateCylinder(height: thickness * 0.5, radius: radius + 0.02)
+        var ringMat = UnlitMaterial()
+        ringMat.color = .init(tint: UIColor(red: 0.0, green: 0.75, blue: 1.0, alpha: 0.18))
+        ringMat.blending = .transparent(opacity: 1.0)
+        let ring = ModelEntity(mesh: ringMesh, materials: [ringMat])
+        ring.name = "hover_ring"
+        ring.position.y = thickness * 0.25
+        buttonRoot.addChild(ring)
 
         return buttonRoot
     }
@@ -382,7 +382,7 @@ struct ImmersiveView: View {
         func makePanel(faceSign: Float) -> Entity {
             let panel = Entity()
             let bodyMesh = MeshResource.generateBox(size: SIMD3(panelWidth, panelHeight, panelDepth))
-            let bodyMaterial = SimpleMaterial(color: UIColor(white: 0.18, alpha: 1.0),
+            let bodyMaterial = SimpleMaterial(color: UIColor(white: 0.28, alpha: 1.0),
                                                roughness: 0.9,
                                                isMetallic: false)
             let body = ModelEntity(mesh: bodyMesh, materials: [bodyMaterial])
@@ -850,21 +850,16 @@ struct ImmersiveView: View {
         return material
     }
 
-    /// Creates a PBR material with normal map for panel faces
-    private func makePanelFaceMaterial(texture: TextureResource?, normalMap: TextureResource?, fallbackColor: UIColor) -> PhysicallyBasedMaterial {
-        var material = PhysicallyBasedMaterial()
+    /// Creates an unlit material for panel faces to keep controls readable in simulator exposure.
+    private func makePanelFaceMaterial(texture: TextureResource?, normalMap: TextureResource?, fallbackColor: UIColor) -> UnlitMaterial {
+        var material = UnlitMaterial()
         if let texture {
-            material.baseColor = .init(tint: .white,
-                                       texture: MaterialParameters.Texture(texture))
+            material.color = .init(tint: .white,
+                                   texture: MaterialParameters.Texture(texture))
         } else {
-            material.baseColor = .init(tint: fallbackColor)
+            material.color = .init(tint: fallbackColor)
         }
-        material.roughness = .init(floatLiteral: 0.7)
-        material.metallic = .init(floatLiteral: 0.1)
-        
-        if let normalMap {
-            material.normal = .init(texture: MaterialParameters.Texture(normalMap))
-        }
+        _ = normalMap
         return material
     }
 
@@ -1072,7 +1067,6 @@ struct ImmersiveView: View {
         let root = Entity()
         root.addChild(makeOfficeShell(layout: layout, posterTextures: posterTextures, historyTextures: historyTextures))
         root.addChild(makeOfficeLighting(layout: layout))
-        root.addChild(makeOfficeFurniture(layout: layout))
         return root
     }
 
@@ -1081,8 +1075,8 @@ struct ImmersiveView: View {
                                  historyTextures: [TextureResource]) -> Entity {
         let root = Entity()
         let wallThickness: Float = 0.12
-        let floorThickness: Float = 0.002
-        let floorY: Float = 0.0  // Floor at ground level
+        let floorThickness: Float = 0.04
+        let floorY: Float = -0.03
         let halfWidth = layout.width * 0.5
         let halfDepth = layout.depth * 0.5
 
@@ -1216,22 +1210,6 @@ struct ImmersiveView: View {
         floor.components.set(GroundingShadowComponent(castsShadow: false))
         root.addChild(floor)
 
-        var windowMaterial = UnlitMaterial()
-        windowMaterial.color = .init(tint: UIColor(red: 0.72, green: 0.86, blue: 1.0, alpha: 1.0))
-        let windowMesh = MeshResource.generateBox(size: SIMD3<Float>(2.4, 1.3, 0.02))
-        let windowZ = layout.center.z - halfDepth + wallThickness * 0.5 + 0.02
-        let windowY = layout.height * 0.65
-        let windowXOffset = layout.width * 0.2
-        let windowPositions = [
-            SIMD3(layout.center.x - windowXOffset, windowY, windowZ),
-            SIMD3(layout.center.x + windowXOffset, windowY, windowZ)
-        ]
-        for position in windowPositions {
-            let window = ModelEntity(mesh: windowMesh, materials: [windowMaterial])
-            window.position = position
-            root.addChild(window)
-        }
-
         let posterMesh = MeshResource.generatePlane(width: 2.0, depth: 1.4)
         let posterRotation = simd_quatf(angle: -.pi / 2, axis: SIMD3(1, 0, 0))
         let posterY = layout.height * 0.6
@@ -1257,19 +1235,27 @@ struct ImmersiveView: View {
     private func makeFloorMaterial() -> PhysicallyBasedMaterial {
         var material = PhysicallyBasedMaterial()
         
-        // Generate procedural concrete-like texture
-        let floorTexture = generateFloorTexture()
-        let floorNormal = generateFloorNormalMap()
-        
-        material.baseColor = .init(tint: UIColor(red: 0.45, green: 0.42, blue: 0.38, alpha: 1.0),
-                                   texture: floorTexture.map { MaterialParameters.Texture($0) })
-        material.roughness = .init(floatLiteral: 0.85)
-        material.metallic = .init(floatLiteral: 0.0)
-        
-        if let normalTex = floorNormal {
-            material.normal = .init(texture: MaterialParameters.Texture(normalTex))
+        if let url = realityKitContentBundle.url(forResource: "floor_concrete",
+                                                  withExtension: "png",
+                                                  subdirectory: "Textures"),
+           let floorTex = try? TextureResource.load(contentsOf: url) {
+            material.baseColor = .init(tint: UIColor(white: 0.95, alpha: 1.0),
+                                       texture: MaterialParameters.Texture(floorTex))
+        } else if let url = realityKitContentBundle.url(forResource: "floor_concrete",
+                                                         withExtension: "png",
+                                                         subdirectory: nil),
+                  let floorTex = try? TextureResource.load(contentsOf: url) {
+            material.baseColor = .init(tint: UIColor(white: 0.95, alpha: 1.0),
+                                       texture: MaterialParameters.Texture(floorTex))
+        } else {
+            material.baseColor = .init(tint: UIColor(red: 0.43, green: 0.41, blue: 0.39, alpha: 1.0))
         }
         
+        // Keep texture frequency low to reduce shimmer in simulator.
+        material.textureCoordinateTransform = .init(scale: SIMD2<Float>(1.5, 1.5))
+        material.roughness = .init(floatLiteral: 1.0)
+        material.metallic = .init(floatLiteral: 0.0)
+
         return material
     }
     
@@ -1477,11 +1463,10 @@ struct ImmersiveView: View {
         let root = Entity()
         let warmLight = UIColor(red: 1.0, green: 0.97, blue: 0.9, alpha: 1.0)
 
-        // Main overhead directional light with shadows
+        // Main overhead directional light
         let directional = DirectionalLight()
         directional.light.color = warmLight
-        directional.light.intensity = 3500
-        directional.shadow = DirectionalLightComponent.Shadow(maximumDistance: 35.0, depthBias: 0.5)
+        directional.light.intensity = 6500
         directional.position = SIMD3(layout.center.x,
                                      layout.height,
                                      layout.center.z)
@@ -1491,14 +1476,14 @@ struct ImmersiveView: View {
         root.addChild(directional)
 
         // Multiple fill lights distributed around the room for better ambient coverage
-        let fillLightIntensity: Float = 8000
-        let fillLightRadius: Float = 15.0
+        let fillLightIntensity: Float = 22000
+        let fillLightRadius: Float = 30.0
         let fillPositions: [SIMD3<Float>] = [
-            SIMD3(layout.center.x - layout.width * 0.3, layout.height * 0.6, layout.center.z - layout.depth * 0.3),
-            SIMD3(layout.center.x + layout.width * 0.3, layout.height * 0.6, layout.center.z - layout.depth * 0.3),
-            SIMD3(layout.center.x - layout.width * 0.3, layout.height * 0.6, layout.center.z + layout.depth * 0.3),
-            SIMD3(layout.center.x + layout.width * 0.3, layout.height * 0.6, layout.center.z + layout.depth * 0.3),
-            SIMD3(layout.center.x, layout.height * 0.4, layout.center.z),  // Center lower fill
+            SIMD3(layout.center.x - layout.width * 0.42, layout.height * 0.45, layout.center.z - layout.depth * 0.42),
+            SIMD3(layout.center.x + layout.width * 0.42, layout.height * 0.45, layout.center.z - layout.depth * 0.42),
+            SIMD3(layout.center.x - layout.width * 0.42, layout.height * 0.45, layout.center.z + layout.depth * 0.42),
+            SIMD3(layout.center.x + layout.width * 0.42, layout.height * 0.45, layout.center.z + layout.depth * 0.42),
+            SIMD3(layout.center.x, layout.height * 0.35, layout.center.z),
         ]
         for pos in fillPositions {
             let fill = PointLight()
@@ -1509,13 +1494,20 @@ struct ImmersiveView: View {
             root.addChild(fill)
         }
 
+        let ambientLift = PointLight()
+        ambientLift.light.color = warmLight
+        ambientLift.light.intensity = 12000
+        ambientLift.light.attenuationRadius = 48.0
+        ambientLift.position = SIMD3(layout.center.x, layout.height * 0.45, layout.center.z)
+        root.addChild(ambientLift)
+
         // Circular ceiling lights (period-appropriate)
         let lightRadius: Float = 0.2
         let lightThickness: Float = 0.04
         let fixtureY = layout.height - 0.06
         
         let lightMesh = MeshResource.generateCylinder(height: lightThickness, radius: lightRadius)
-        let emissiveMaterial = UnlitMaterial(color: UIColor(white: 0.98, alpha: 1.0))
+        let emissiveMaterial = UnlitMaterial(color: UIColor(white: 0.74, alpha: 1.0))
         
         // Grid: lights in a 5x4 pattern
         let lightRows = 5
@@ -1535,7 +1527,7 @@ struct ImmersiveView: View {
                 // Subtle ring around the light
                 let ringMesh = MeshResource.generateCylinder(height: lightThickness * 0.5,
                                                               radius: lightRadius + 0.02)
-                let ringMat = SimpleMaterial(color: UIColor(white: 0.9, alpha: 1.0),
+                let ringMat = SimpleMaterial(color: UIColor(white: 0.75, alpha: 1.0),
                                              roughness: 0.5, isMetallic: true)
                 let ring = ModelEntity(mesh: ringMesh, materials: [ringMat])
                 ring.position = SIMD3(x, fixtureY + 0.001, z)
@@ -1687,9 +1679,9 @@ struct InfoPanelView: View {
     let onDismiss: () -> Void
 
     // Classic 1950s-era serif typeface
-    private let serifFont = Font.custom("Times New Roman", size: 17)
-    private let serifTitleFont = Font.custom("Times New Roman", size: 22)
-    private let serifCalloutFont = Font.custom("Times New Roman", size: 14)
+    private let serifFont = Font.custom("Times New Roman", size: 19)
+    private let serifTitleFont = Font.custom("Times New Roman", size: 26)
+    private let serifCalloutFont = Font.custom("Times New Roman", size: 16)
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1727,8 +1719,8 @@ struct InfoPanelView: View {
             }
             .padding(.top, 4)
         }
-        .padding(20)
-        .frame(width: 380)
+        .padding(24)
+        .frame(width: 460)
         .background(.ultraThinMaterial)
         .cornerRadius(16)
     }
