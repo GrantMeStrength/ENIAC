@@ -26,6 +26,7 @@ struct ENIACApp: App {
                     .environment(appModel)
             }
         }
+        .windowStyle(.plain)
         .windowResizability(.contentSize)
         
         ImmersiveSpace(id: appModel.immersiveSpaceID) {
