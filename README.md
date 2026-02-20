@@ -16,6 +16,14 @@ The environment is designed to communicate ENIAC's physical scale, layout, and o
 - Historical photo gallery integrated into the room
 - Tuned room lighting, textures, and materials for simulator/headset viewing
 
+## Screenshots
+
+<p align="center">
+  <img src="Simulator%20Screenshot%20-%20Apple%20Vision%20Pro%20-%202026-02-20%20at%2007.37.38.png" alt="ENIAC immersive room overview" width="32%" />
+  <img src="Simulator%20Screenshot%20-%20Apple%20Vision%20Pro%20-%202026-02-20%20at%2007.37.52.png" alt="ENIAC cabinets and information hotspots" width="32%" />
+  <img src="Simulator%20Screenshot%20-%20Apple%20Vision%20Pro%20-%202026-02-20%20at%2007.38.05.png" alt="ENIAC environment detail view" width="32%" />
+</p>
+
 ## Brief history of ENIAC
 
 ENIAC (Electronic Numerical Integrator and Computer) was developed during the 1940s at the University of Pennsylvania's Moore School and publicly unveiled in 1946. It is widely recognized as one of the first large-scale, general-purpose electronic digital computers.  
@@ -29,4 +37,3 @@ Its development also highlighted the foundational work of early programmers who 
 ## Credit
 
 Special credit and thanks to **Dr. Brian Stuart** for ENIAC educational resources and simulator work that helped inform historical interpretation.
-
