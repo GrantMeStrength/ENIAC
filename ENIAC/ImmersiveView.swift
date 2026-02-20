@@ -1239,16 +1239,16 @@ struct ImmersiveView: View {
                                                   withExtension: "png",
                                                   subdirectory: "Textures"),
            let floorTex = try? TextureResource.load(contentsOf: url) {
-            material.baseColor = .init(tint: UIColor(white: 0.95, alpha: 1.0),
+            material.baseColor = .init(tint: UIColor(white: 0.65, alpha: 1.0),
                                        texture: MaterialParameters.Texture(floorTex))
         } else if let url = realityKitContentBundle.url(forResource: "floor_concrete",
                                                          withExtension: "png",
                                                          subdirectory: nil),
                   let floorTex = try? TextureResource.load(contentsOf: url) {
-            material.baseColor = .init(tint: UIColor(white: 0.95, alpha: 1.0),
+            material.baseColor = .init(tint: UIColor(white: 0.65, alpha: 1.0),
                                        texture: MaterialParameters.Texture(floorTex))
         } else {
-            material.baseColor = .init(tint: UIColor(red: 0.43, green: 0.41, blue: 0.39, alpha: 1.0))
+            material.baseColor = .init(tint: UIColor(red: 0.32, green: 0.30, blue: 0.28, alpha: 1.0))
         }
         
         // Keep texture frequency low to reduce shimmer in simulator.
