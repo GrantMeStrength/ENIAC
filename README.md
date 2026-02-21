@@ -41,4 +41,4 @@ Its development also highlighted the foundational work of early programmers who 
 
 ## Credit
 
-Special credit and thanks to **Dr. Brian Stuart** for ENIAC educational resources and simulator work that helped inform historical interpretation.
+Special credit and thanks to **Dr. Brian Stuart** (https://github.com/blstuart) for ENIAC educational resources and simulator work that helped inform historical interpretation.
