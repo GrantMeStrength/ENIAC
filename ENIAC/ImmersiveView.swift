@@ -327,7 +327,7 @@ struct ImmersiveView: View {
         let thickness: Float = 0.003
 
         let discMesh = MeshResource.generateCylinder(height: thickness, radius: radius)
-        var discMaterial = SimpleMaterial(color: UIColor(white: 0.35, alpha: 0.55),
+        let discMaterial = SimpleMaterial(color: UIColor(white: 0.35, alpha: 0.55),
                                            roughness: 0.9,
                                            isMetallic: false)
         let disc = ModelEntity(mesh: discMesh, materials: [discMaterial])
@@ -375,7 +375,7 @@ struct ImmersiveView: View {
         let panelHeight: Float = 2.44
         let panelDepth: Float = 0.61
         let faceDepth: Float = 0.03
-        let bulbRadius: Float = 0.016
+        let _: Float = 0.016
         let floorClearance: Float = 0.01
         let panelGap: Float = 0.01
         let panelPitch = panelWidth + panelGap
@@ -438,7 +438,7 @@ struct ImmersiveView: View {
             // Circle ring parameters
             let circleRadius: Float = 0.012
             let circleThickness: Float = 0.001
-            let ringSegments = 24
+            _ = 24
             
             // Pre-generate digit text meshes (0-9)
             var digitMeshes: [MeshResource] = []
@@ -599,12 +599,12 @@ struct ImmersiveView: View {
         let overlayFront = panelDepth * 0.5 + faceDepth + 0.06
         let lightPanelFaceOffset = overlayFront + panelThicknessLP * 0.5 + 0.002
         let lightPanelH: Float = 0.34
-        let lightPanelY = panelY + panelHeight * 0.5 - lightPanelH * 0.25
+        _ = panelY + panelHeight * 0.5 - lightPanelH * 0.25
         
         // Back row panels - facing user (positive Z)
         // Both panels on the right side of the back wall
-        let backPanelZ = backZ + lightPanelFaceOffset
-        let tunedY: Float = 2.05
+        _ = backZ + lightPanelFaceOffset
+        let _: Float = 2.05
         let lp2 = makeLightPanel(position: SIMD3(1.5449044, 2.080772, -8.898484),
                                   faceNormal: SIMD3(0, 0, 1), name: "lp_back_right")
         root.addChild(lp2)
@@ -752,7 +752,7 @@ struct ImmersiveView: View {
         let frameThickness: Float = 0.06
         let casterRadius: Float = 0.06
         let topCapHeight: Float = 0.08
-        let totalHeight = legHeight + panelFaceHeight + topCapHeight
+        _ = legHeight + panelFaceHeight + topCapHeight
         
         // Load free-standing unit texture
         var freestandingTexture: TextureResource?
@@ -972,7 +972,7 @@ struct ImmersiveView: View {
                 for dx in -knobRadius...knobRadius {
                     let dist = sqrt(Float(dx * dx + dy * dy))
                     if dist <= Float(knobRadius) {
-                        let normalizedDist = dist / Float(knobRadius)
+                        _ = dist / Float(knobRadius)
                         // Hemisphere normal
                         let nx = Float(dx) / Float(knobRadius) * knobStrength
                         let ny = Float(dy) / Float(knobRadius) * knobStrength
@@ -1030,7 +1030,7 @@ struct ImmersiveView: View {
         
         // Convert to TextureResource
         do {
-            let texture = try TextureResource.generate(from: cgImage, options: .init(semantic: .normal))
+            let texture = try TextureResource(image: cgImage, options: .init(semantic: .normal))
             return texture
         } catch {
             print("Failed to create normal map texture: \(error)")
@@ -1467,7 +1467,7 @@ struct ImmersiveView: View {
                                      intent: .defaultIntent) else { return nil }
         
         let semantic: TextureResource.Semantic = isNormal ? .normal : .color
-        return try? TextureResource.generate(from: cgImage, options: .init(semantic: semantic))
+        return try? TextureResource(image: cgImage, options: .init(semantic: semantic))
     }
 
     private func makeOfficeLighting(layout: RoomLayout) -> Entity {
